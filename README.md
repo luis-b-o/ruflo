@@ -54,12 +54,26 @@ npx claude-flow@alpha init --force
 # 2. Explore all revolutionary capabilities  
 npx claude-flow@alpha --help
 
-# 3. Launch the interactive hive-mind wizard
-npx claude-flow@alpha hive-mind wizard
+# 3a. Quick AI coordination (recommended for most tasks)
+npx claude-flow@alpha swarm "build me a REST API" --claude
 
-# 4. Build something amazing with AI coordination
-npx claude-flow@alpha hive-mind spawn "build me something amazing" --claude
+# 3b. OR launch the full hive-mind system (for complex projects)
+npx claude-flow@alpha hive-mind wizard
+npx claude-flow@alpha hive-mind spawn "build enterprise system" --claude
 ```
+
+### 🤔 **Swarm vs Hive-Mind: Which to Use?**
+
+| Feature | `swarm` Command | `hive-mind` Command |
+|---------|----------------|-------------------|
+| **Best For** | Quick tasks, single objectives | Complex projects, persistent sessions |
+| **Setup** | Instant - no configuration needed | Interactive wizard setup |
+| **Session** | Temporary coordination | Persistent with resume capability |
+| **Memory** | Task-scoped | Project-wide with SQLite storage |
+| **Agents** | Auto-spawned for task | Manual control with specializations |
+| **Use When** | "Build X", "Fix Y", "Analyze Z" | Multi-feature projects, team coordination |
+
+**Quick Rule:** Start with `swarm` for most tasks. Use `hive-mind` when you need persistent sessions or complex multi-agent coordination.
 
 ## 🎯 **Typical Workflows - Your "Happy Path" Guide**
 
@@ -365,38 +379,6 @@ npx claude-flow@alpha daa lifecycle-manage --agentId "agent-123" --action "scale
 - `security_scan`, `backup_create`, `restore_system`
 - `config_manage`, `features_detect`, `log_analysis`
 
- 
----
-
-## ⚡ **87 Advanced MCP Tools**
-
-### **🧠 Neural & Cognitive Tools**
-```bash
-# Neural pattern recognition and training
-npx claude-flow@alpha neural train --pattern coordination --epochs 50
-npx claude-flow@alpha neural predict --model cognitive-analysis
-npx claude-flow@alpha cognitive analyze --behavior "development workflow"
-```
-
-### **💾 SQLite Memory Systems**
-```bash
-# Cross-session memory management with SQLite persistence
-npx claude-flow@alpha memory store "project-context" "Full-stack app requirements"
-npx claude-flow@alpha memory query "authentication" --namespace sparc
-npx claude-flow@alpha memory stats  # Shows 12 specialized tables
-npx claude-flow@alpha memory export backup.json --namespace default
-npx claude-flow@alpha memory import project-memory.json
-```
-
-### **🔄 Workflow Orchestration**
-```bash
-# Advanced workflow automation
-npx claude-flow@alpha workflow create --name "CI/CD Pipeline" --parallel
-npx claude-flow@alpha batch process --items "test,build,deploy" --concurrent
-npx claude-flow@alpha pipeline create --config advanced-deployment.json
-
-```
-
 ### **📊 GitHub Integration**
 ```bash
 # GitHub workflow orchestration and coordination
@@ -561,7 +543,7 @@ npm install -g claude-flow@alpha
 npx claude-flow@alpha init --force
 
 # Verify installation
-claude-flow --version  # Should show 2.0.0-alpha.x
+claude-flow --version  # Should show 2.0.0-alpha.53
 ```
 
 ### **🔧 Enhanced Configuration**
@@ -580,36 +562,18 @@ npx claude-flow@alpha hive-mind test --agents 5 --coordination-test
 
 ## 📋 **Alpha Command Reference**
 
-### **🐝 Hive-Mind Commands**
-| Command | Description | Example |
-|---------|-------------|---------|
-| `hive-mind wizard` | Interactive hive setup | `npx claude-flow@alpha hive-mind wizard` |
-| `hive-mind spawn` | Deploy intelligent swarm | `npx claude-flow@alpha hive-mind spawn "task" --claude` |
-| `hive-mind status` | Monitor coordination | `npx claude-flow@alpha hive-mind status --real-time` |
+For complete command documentation, run:
+```bash
+npx claude-flow@alpha --help          # Main help
+npx claude-flow@alpha help <command>  # Detailed command help
+```
 
-### **🧠 Neural Commands**
-| Command | Description | Example |
-|---------|-------------|---------|
-| `neural train` | Train coordination patterns | `npx claude-flow@alpha neural train --pattern optimization` |
-| `neural predict` | AI-powered predictions | `npx claude-flow@alpha neural predict --model performance` |
-| `cognitive analyze` | Behavior analysis | `npx claude-flow@alpha cognitive analyze --workflow dev` |
-
-### **💾 Memory Commands**
-| Command | Description | Example |
-|---------|-------------|---------|
-| `memory store` | Store key-value pair | `npx claude-flow@alpha memory store "context" "data"` |
-| `memory query` | Search memory entries | `npx claude-flow@alpha memory query "auth" --namespace sparc` |
-| `memory stats` | Show memory statistics | `npx claude-flow@alpha memory stats` |
-| `memory export` | Export memory to file | `npx claude-flow@alpha memory export backup.json` |
-| `memory import` | Import memory from file | `npx claude-flow@alpha memory import project.json` |
-| `memory list` | List all namespaces | `npx claude-flow@alpha memory list` |
-
-### **📊 Monitoring Commands**
-| Command | Description | Example |
-|---------|-------------|---------|
-| `memory stats` | Memory usage statistics | `npx claude-flow@alpha memory stats` |
-| `workflow create` | Create workflow pipelines | `npx claude-flow@alpha workflow create --name "CI/CD"` |
-| `github <mode>` | GitHub coordination modes | `npx claude-flow@alpha github gh-coordinator` |
+**Key Commands:**
+- **Hive-Mind**: `hive-mind wizard`, `hive-mind spawn`, `hive-mind status`
+- **Neural**: `neural train`, `neural predict`, `cognitive analyze`
+- **Memory**: `memory store`, `memory query`, `memory stats`, `memory export/import`
+- **GitHub**: `github <mode>` (6 specialized modes available)
+- **Workflows**: `workflow create`, `batch process`, `pipeline create`
 
 ---
 
@@ -807,23 +771,13 @@ npx claude-flow security metrics --last-24h
 npx claude-flow security alerts --configure
 ```
 
-#### **🔧 Configurable Security Policies**
-```json
-// .claude/security.json
-{
-  "policies": {
-    "agent_isolation": true,
-    "memory_encryption": true,
-    "audit_logging": "verbose",
-    "threat_detection": "neural",
-    "max_agent_resources": {
-      "cpu": "50%",
-      "memory": "2GB",
-      "disk": "10GB"
-    }
-  }
-}
-```
+#### **🔧 Auto-Configured Security**
+Claude-Flow v2.0.0 Alpha automatically configures secure defaults:
+- Agent isolation and resource limits
+- Encrypted memory storage with AES-256
+- Complete audit logging for all operations
+- Neural threat detection and prevention
+- Auto-approved MCP permissions for trusted tools
 
 #### **🛡️ Defense-in-Depth Architecture**
 ```
@@ -871,7 +825,7 @@ MIT License - see [LICENSE](./LICENSE) for details.
 ### **🚀 Ready to experience the future of AI development?**
 
 ```bash
-npx --y claude-flow@alpha init --force
+npx claude-flow@alpha init --force
 ```
 
 **Join the alpha testing revolution!**
