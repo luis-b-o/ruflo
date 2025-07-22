@@ -645,6 +645,52 @@ Message 2: [BatchTool - Claude Code execution]
   - Bash "mkdir -p api/{routes,models,tests}"
 ```
 
+## 🖥️ AGENTIC-FLOW UI (NEW!)
+
+### Launch the Visual Interface
+
+**Quick Start:**
+```bash
+# Launch standalone UI
+claude-flow ui
+
+# Or with orchestration system
+claude-flow start --vite
+
+# With options
+claude-flow ui --port 5173 --open
+```
+
+### UI Features
+
+**1. HiveMind Dashboard**
+- Real-time 5-agent swarm visualization
+- Mesh topology network graph
+- Agent activity monitoring
+- Task distribution view
+
+**2. Mastra AI Integration**
+- All 6 pre-configured agents visible
+- Custom agent creation interface
+- Agent capability matrix
+
+**3. MCP Tools Browser**
+- Visual access to all 71+ tools
+- Parameter builders
+- Real-time execution
+
+**4. Retro Console Theme**
+- Monochrome green phosphor (#00ff00)
+- CRT effects with scanlines
+- ASCII art decorations
+- Terminal-style interface
+
+### Navigation
+- `/` - Main dashboard
+- `/swarm` - Swarm management
+- `/mcp-tools` - MCP tool browser
+- `/terminal` - Integrated terminal
+
 ### 🎯 MANDATORY SWARM PATTERN
 
 When given ANY complex task with swarms:

@@ -9,6 +9,7 @@ import SwarmView from './components/swarm/SwarmView'
 import MCPTools from './components/mcp/MCPTools'
 import Terminal from './components/shared/Terminal'
 import Navigation from './components/shared/Navigation'
+import MemoryExplorer from './components/memory/MemoryExplorer'
 
 // Stores (to be implemented)
 import { useSwarmStore } from './stores/swarmStore'
@@ -58,6 +59,7 @@ function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/swarm" element={<SwarmView />} />
                 <Route path="/mcp-tools" element={<MCPTools />} />
+                <Route path="/memory" element={<MemoryExplorer />} />
                 <Route path="/terminal" element={<Terminal />} />
               </Routes>
             </main>

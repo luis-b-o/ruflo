@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --border: 0 255 0;
+    --input: 0 255 0;
+    --ring: 0 255 0;
+    --background: 0 0 0;
+    --foreground: 0 255 0;
+    --primary: 0 255 0;
+    --primary-foreground: 0 0 0;
+    --secondary: 0 204 0;
+    --secondary-foreground: 0 255 0;
+    --muted: 0 136 0;
+    --muted-foreground: 0 255 0;
+    --accent: 0 255 0;
+    --accent-foreground: 0 0 0;
+    --destructive: 255 0 0;
+    --destructive-foreground: 0 0 0;
+  }
+}
+
+@layer utilities {
+  .border-border {
+    border-color: rgb(var(--border));
+  }
+}
+
 /* Global retro console styles */
 @layer base {
   :root {
@@ -135,8 +161,8 @@
 }
 
 @keyframes scan-line {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
+  0% { transform: translateY(-100vh); }
+  100% { transform: translateY(100vh); }
 }
 
 @keyframes text-flicker {
@@ -268,4 +294,46 @@
 .retro-panel {
   @apply bg-black/80 border border-green-900 p-4;
   box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.1);
+}
+
+/* React Flow customization */
+.react-flow__renderer {
+  background: #000;
+}
+
+.react-flow__edge-path {
+  stroke: #10b981;
+  stroke-width: 2;
+}
+
+.react-flow__edge.animated path {
+  stroke-dasharray: 5;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+.react-flow__node-agent {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.react-flow__controls {
+  @apply bg-black border border-green-600;
+}
+
+.react-flow__controls-button {
+  @apply bg-black border-green-600 text-green-600;
+  @apply hover:bg-green-600/20;
+}
+
+.react-flow__minimap {
+  @apply bg-black/80 border border-green-600;
+}
+
+.react-flow__background pattern {
+  stroke: #003300;
 }
