@@ -17,6 +17,7 @@ const WebSocketTester: React.FC = () => {
   const [showRaw, setShowRaw] = useState(false)
   const [connectionAttempts, setConnectionAttempts] = useState(0)
   const [triedFallback, setTriedFallback] = useState(false)
+  const [isStopped, setIsStopped] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -30,6 +31,12 @@ const WebSocketTester: React.FC = () => {
   }, [messages])
 
   const connect = useCallback(() => {
+    // Check if stopped
+    if (isStopped) {
+      addMessage('❌ Connection stopped. Click Stop to reset, then try again.', 'received')
+      return
+    }
+
     // Clear any existing timeout
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current)
@@ -41,6 +48,12 @@ const WebSocketTester: React.FC = () => {
     setTriedFallback(false)
 
     const attemptConnection = (wsUrl: string, isFallback = false) => {
+      // Check if stopped before each attempt
+      if (isStopped) {
+        addMessage('❌ Connection attempt cancelled - stopped', 'received')
+        return
+      }
+
       setConnectionAttempts(prev => prev + 1)
       
       try {
@@ -48,6 +61,13 @@ const WebSocketTester: React.FC = () => {
         wsRef.current = ws
 
         ws.onopen = () => {
+          // Check if stopped after connection opens
+          if (isStopped) {
+            ws.close()
+            addMessage('❌ Connection opened but immediately closed - stopped', 'received')
+            return
+          }
+          
           setConnected(true)
           setConnectionAttempts(0)
           setTriedFallback(false)
@@ -55,7 +75,10 @@ const WebSocketTester: React.FC = () => {
         }
 
         ws.onmessage = (event) => {
-          addMessage(event.data, 'received')
+          // Only process messages if not stopped
+          if (!isStopped) {
+            addMessage(event.data, 'received')
+          }
         }
 
         ws.onerror = (error) => {
@@ -65,6 +88,12 @@ const WebSocketTester: React.FC = () => {
         ws.onclose = (event) => {
           setConnected(false)
           wsRef.current = null
+          
+          // Don't try to reconnect if stopped
+          if (isStopped) {
+            addMessage('🔌 Connection closed - stopped', 'received')
+            return
+          }
           
           // Only try fallback once and if connection failed immediately
           if (!triedFallback && event.code === 1006 && connectionAttempts < 2) {
@@ -89,10 +118,12 @@ const WebSocketTester: React.FC = () => {
           }
           
           // Auto-reconnect logic (but not for initial connection failures)
-          if (autoReconnect && event.code !== 1006 && connectionAttempts < 3) {
+          if (autoReconnect && event.code !== 1006 && connectionAttempts < 3 && !isStopped) {
             reconnectTimeoutRef.current = setTimeout(() => {
-              addMessage('🔄 Attempting to reconnect...', 'received')
-              connect()
+              if (!isStopped) {
+                addMessage('🔄 Attempting to reconnect...', 'received')
+                connect()
+              }
             }, 3000)
           } else if (connectionAttempts >= 3) {
             addMessage('❌ Max connection attempts reached. Auto-reconnect disabled.', 'received')
@@ -120,7 +151,7 @@ const WebSocketTester: React.FC = () => {
 
     addMessage(`🔌 Attempting to connect to ${url}...`, 'received')
     attemptConnection(url)
-  }, [url, autoReconnect, connectionAttempts, triedFallback])
+  }, [url, autoReconnect, connectionAttempts, triedFallback, isStopped])
 
   const disconnect = () => {
     // Clear any pending reconnection
@@ -141,6 +172,9 @@ const WebSocketTester: React.FC = () => {
   }
 
   const stopAllConnections = () => {
+    // Set stopped flag first to prevent new connections
+    setIsStopped(true)
+    
     // Clear any pending reconnection
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current)
@@ -159,7 +193,14 @@ const WebSocketTester: React.FC = () => {
     setTriedFallback(false)
     setAutoReconnect(false)
     
-    addMessage('⏹️ All connection attempts stopped', 'received')
+    addMessage('⏹️ All connection attempts stopped. Click Stop again to reset.', 'received')
+  }
+
+  const resetConnection = () => {
+    setIsStopped(false)
+    setConnectionAttempts(0)
+    setTriedFallback(false)
+    addMessage('🔄 Connection reset. Ready to connect.', 'received')
   }
 
   // Cleanup on unmount
@@ -256,14 +297,18 @@ const WebSocketTester: React.FC = () => {
             </button>
           )}
           
-          {/* Stop button - always visible for emergency stop */}
+          {/* Stop/Reset button - always visible for emergency stop */}
           <button
-            onClick={stopAllConnections}
-            className="px-4 py-2 bg-gray-900/30 text-gray-400 border border-gray-700 rounded hover:bg-gray-800/50 transition-colors flex items-center gap-2"
-            title="Stop all connection attempts and disable auto-reconnect"
+            onClick={isStopped ? resetConnection : stopAllConnections}
+            className={`px-4 py-2 border rounded hover:bg-opacity-50 transition-colors flex items-center gap-2 ${
+              isStopped 
+                ? 'bg-blue-900/30 text-blue-400 border-blue-700 hover:bg-blue-900/50' 
+                : 'bg-gray-900/30 text-gray-400 border-gray-700 hover:bg-gray-800/50'
+            }`}
+            title={isStopped ? "Reset connection state" : "Stop all connection attempts and disable auto-reconnect"}
           >
             <Square className="w-4 h-4" />
-            Stop
+            {isStopped ? 'Reset' : 'Stop'}
           </button>
         </div>
 
