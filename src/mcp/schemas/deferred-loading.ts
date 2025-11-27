@@ -429,7 +429,7 @@ export function calculateTokenSavings(): {
   coreToolCount: number;
   deferredToolCount: number;
   totalTools: number;
-  estimatedCoreTokes: number;
+  estimatedCoreTokens: number;
   estimatedDeferredTokens: number;
   estimatedSavings: number;
   savingsPercent: string;
@@ -442,11 +442,11 @@ export function calculateTokenSavings(): {
   const tokensPerFullTool = 3000;
   const tokensPerMetadata = 40;
 
-  const estimatedCoreTokes = coreToolCount * tokensPerFullTool;
+  const estimatedCoreTokens = coreToolCount * tokensPerFullTool;
   const estimatedDeferredTokens = deferredToolCount * tokensPerMetadata;
 
   const withoutDeferred = totalTools * tokensPerFullTool;
-  const withDeferred = estimatedCoreTokes + estimatedDeferredTokens;
+  const withDeferred = estimatedCoreTokens + estimatedDeferredTokens;
   const estimatedSavings = withoutDeferred - withDeferred;
   const savingsPercent = ((estimatedSavings / withoutDeferred) * 100).toFixed(1);
 
@@ -454,7 +454,7 @@ export function calculateTokenSavings(): {
     coreToolCount,
     deferredToolCount,
     totalTools,
-    estimatedCoreTokes,
+    estimatedCoreTokens,
     estimatedDeferredTokens,
     estimatedSavings,
     savingsPercent: `${savingsPercent}%`

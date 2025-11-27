@@ -97,6 +97,15 @@ Returns:
         summarize?: boolean;
       };
 
+      // Security: Limit array size to prevent resource exhaustion
+      const MAX_BATCH_SIZE = 50;
+      if (!queries || queries.length === 0) {
+        throw new Error('At least one query is required');
+      }
+      if (queries.length > MAX_BATCH_SIZE) {
+        throw new Error(`Maximum ${MAX_BATCH_SIZE} queries allowed per batch (received ${queries.length})`);
+      }
+
       logger.info('Batch memory query', { queryCount: queries.length, parallel });
 
       if (!context?.orchestrator) {
@@ -218,6 +227,15 @@ Returns:
         stopOnError?: boolean;
       };
 
+      // Security: Limit array size to prevent resource exhaustion
+      const MAX_BATCH_SIZE = 50;
+      if (!tasks || tasks.length === 0) {
+        throw new Error('At least one task is required');
+      }
+      if (tasks.length > MAX_BATCH_SIZE) {
+        throw new Error(`Maximum ${MAX_BATCH_SIZE} tasks allowed per batch (received ${tasks.length})`);
+      }
+
       logger.info('Batch task creation', { taskCount: tasks.length });
 
       if (!context?.orchestrator) {
@@ -322,6 +340,15 @@ Returns:
         includeMetrics?: boolean;
         includeCurrentTask?: boolean;
       };
+
+      // Security: Limit array size to prevent resource exhaustion
+      const MAX_BATCH_SIZE = 100;
+      if (!agentIds || agentIds.length === 0) {
+        throw new Error('At least one agent ID is required');
+      }
+      if (agentIds.length > MAX_BATCH_SIZE) {
+        throw new Error(`Maximum ${MAX_BATCH_SIZE} agent IDs allowed per batch (received ${agentIds.length})`);
+      }
 
       logger.info('Batch agent status check', { agentCount: agentIds.length });
 
@@ -449,6 +476,15 @@ Returns:
         summarizeResults?: boolean;
         maxResultSize?: number;
       };
+
+      // Security: Limit array size to prevent resource exhaustion
+      const MAX_BATCH_SIZE = 50;
+      if (!operations || operations.length === 0) {
+        throw new Error('At least one operation is required');
+      }
+      if (operations.length > MAX_BATCH_SIZE) {
+        throw new Error(`Maximum ${MAX_BATCH_SIZE} operations allowed per batch (received ${operations.length})`);
+      }
 
       logger.info('Batch execute', { operationCount: operations.length, parallel });
 

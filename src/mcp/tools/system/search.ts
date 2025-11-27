@@ -208,21 +208,50 @@ export function createSearchToolsTool(
 
         // Apply regex pattern filter if provided
         if (validatedInput.pattern) {
-          try {
-            const regex = new RegExp(validatedInput.pattern, 'i');
-            metadata = metadata.filter(m => regex.test(m.name));
-            logger.debug('Regex pattern applied', {
-              pattern: validatedInput.pattern,
-              matchCount: metadata.length,
+          // Security: Limit pattern length to prevent ReDoS attacks
+          const MAX_PATTERN_LENGTH = 100;
+          const pattern = validatedInput.pattern.slice(0, MAX_PATTERN_LENGTH);
+
+          // Security: Check for dangerous regex patterns that can cause catastrophic backtracking
+          const dangerousPatterns = /(\.\*){3,}|(\+\+)|(\*\*)|(\?\?)|(\\d\+)+|(\\w\+)+/;
+          const isSafePattern = !dangerousPatterns.test(pattern);
+
+          if (isSafePattern && pattern.length <= MAX_PATTERN_LENGTH) {
+            try {
+              const regex = new RegExp(pattern, 'i');
+              // Security: Add timeout protection via test limit
+              const startTime = Date.now();
+              const REGEX_TIMEOUT_MS = 100;
+
+              metadata = metadata.filter(m => {
+                if (Date.now() - startTime > REGEX_TIMEOUT_MS) {
+                  logger.warn('Regex evaluation timeout, returning partial results');
+                  return false;
+                }
+                return regex.test(m.name);
+              });
+
+              logger.debug('Regex pattern applied', {
+                pattern,
+                matchCount: metadata.length,
+              });
+            } catch (regexError) {
+              logger.warn('Invalid regex pattern, falling back to substring match', {
+                pattern,
+                error: regexError instanceof Error ? regexError.message : 'Unknown',
+              });
+              // Fallback to substring match
+              const lowerPattern = pattern.toLowerCase();
+              metadata = metadata.filter(m => m.name.toLowerCase().includes(lowerPattern));
+            }
+          } else {
+            logger.warn('Unsafe or too long regex pattern, using substring match', {
+              patternLength: validatedInput.pattern.length,
+              isSafe: isSafePattern,
             });
-          } catch (regexError) {
-            logger.warn('Invalid regex pattern, falling back to substring match', {
-              pattern: validatedInput.pattern,
-              error: regexError instanceof Error ? regexError.message : 'Unknown',
-            });
-            // Fallback to substring match
-            const pattern = validatedInput.pattern.toLowerCase();
-            metadata = metadata.filter(m => m.name.toLowerCase().includes(pattern));
+            // Fallback to safe substring match
+            const lowerPattern = pattern.toLowerCase();
+            metadata = metadata.filter(m => m.name.toLowerCase().includes(lowerPattern));
           }
         }
 
