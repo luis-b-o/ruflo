@@ -527,10 +527,11 @@ V3 now implements **171 MCP tools** with full V2 backward compatibility:
 
 | Item | Priority | ADR | Notes |
 |------|----------|-----|-------|
-| Port V2 MCP resources | Medium | ADR-005 | Add missing resources from V2 |
+| ~~Port V2 MCP resources~~ | ~~Medium~~ | ~~ADR-005~~ | ✅ **DONE** - 171 tools implemented |
 | GitHub sync for issues | Low | ADR-016 | Sync claims with GitHub Issues API |
 | Coverage-aware routing | Low | ADR-017 | Route based on test coverage data |
 | More tests | Medium | All | Increase test coverage across packages |
+| MCP Resources (listable) | Low | ADR-005 | Add listable/subscribable MCP resources |
 
 These are enhancements, not blockers for V3 production readiness.
 
