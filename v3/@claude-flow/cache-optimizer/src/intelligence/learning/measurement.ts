@@ -364,7 +364,15 @@ export class MeasurementCollector {
     };
 
     const typeDistribution: Record<CacheEntryType, number> = {
-      context: 0, result: 0, embedding: 0, pattern: 0, decision: 0
+      system_prompt: 0,
+      claude_md: 0,
+      file_read: 0,
+      file_write: 0,
+      tool_result: 0,
+      bash_output: 0,
+      user_message: 0,
+      assistant_message: 0,
+      mcp_context: 0,
     };
 
     if (cacheState?.entries) {
