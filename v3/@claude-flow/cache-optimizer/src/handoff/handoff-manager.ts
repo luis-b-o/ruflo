@@ -1383,6 +1383,13 @@ ${instructions}
     }
     this.activeRequests.clear();
     this.metrics.activeRequests = 0;
+
+    // Cleanup enhanced features
+    this.streaming.cancelAll();
+    this.circuitBreakers.destroy();
+    this.rateLimiters.destroy();
+    await this.persistentStore.close();
+    this.webhooks.clear();
   }
 }
 
