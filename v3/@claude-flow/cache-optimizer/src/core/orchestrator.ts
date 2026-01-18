@@ -836,17 +836,26 @@ export class CacheOptimizer {
   }
 
   private async proactivePrune(_incomingTokens: number): Promise<void> {
+    const release = await this.mutex.acquire();
+    try {
+      await this.proactivePruneInternal(_incomingTokens, 'proactive');
+    } finally {
+      release();
+    }
+  }
+
+  private async proactivePruneInternal(_incomingTokens: number, sessionId: string): Promise<void> {
     const context: ScoringContext = {
       currentQuery: '',
       activeFiles: [],
       activeTools: [],
-      sessionId: 'proactive',
+      sessionId,
       timestamp: Date.now(),
     };
 
     const decision = await this.getPruningDecision(context);
     if (decision.urgency !== 'none') {
-      await this.prune(decision);
+      await this.pruneInternal(decision);
     }
   }
 
