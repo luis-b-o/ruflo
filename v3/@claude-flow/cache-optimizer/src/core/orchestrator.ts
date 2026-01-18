@@ -910,7 +910,7 @@ export class CacheOptimizer {
     return false;
   }
 
-  private async proactivePrune(_incomingTokens: number): Promise<void> {
+  private async _proactivePrune(_incomingTokens: number): Promise<void> {
     const release = await this.mutex.acquire();
     try {
       await this.proactivePruneInternal(_incomingTokens, 'proactive');
