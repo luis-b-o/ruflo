@@ -1903,6 +1903,10 @@ Shell-based daemons for monitoring (Linux/macOS only):
 
 ---
 
+## 🎯 Use Cases & Workflows
+
+Real-world scenarios and pre-built workflows for common tasks.
+
 <details>
 <summary>🎯 <strong>Use Cases</strong> — Real-world scenarios and how to solve them</summary>
 
