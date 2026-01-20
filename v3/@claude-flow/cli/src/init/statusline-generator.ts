@@ -504,44 +504,90 @@ function getAgentDBStats() {
   let vectorCount = 0;
   let dbSizeKB = 0;
   let namespaces = 0;
+  let hasHnsw = false;
 
-  const dbPaths = [
+  // Check for database directories
+  const dbDirPaths = [
     path.join(process.cwd(), '.claude-flow', 'agentdb'),
     path.join(process.cwd(), '.swarm', 'agentdb'),
     path.join(process.cwd(), 'data', 'agentdb'),
     path.join(process.cwd(), '.claude', 'memory'),
+    path.join(process.cwd(), '.agentdb'),
   ];
 
-  for (const dbPath of dbPaths) {
-    if (fs.existsSync(dbPath)) {
+  // Check for direct database files (memory.db, etc.)
+  const dbFilePaths = [
+    path.join(process.cwd(), '.swarm', 'memory.db'),
+    path.join(process.cwd(), '.claude-flow', 'memory.db'),
+    path.join(process.cwd(), '.claude', 'memory.db'),
+    path.join(process.cwd(), 'data', 'memory.db'),
+    path.join(process.cwd(), 'memory.db'),
+  ];
+
+  // Check for HNSW index files
+  const hnswPaths = [
+    path.join(process.cwd(), '.swarm', 'hnsw.index'),
+    path.join(process.cwd(), '.claude-flow', 'hnsw.index'),
+    path.join(process.cwd(), 'data', 'hnsw.index'),
+  ];
+
+  // Check direct database files first
+  for (const dbFile of dbFilePaths) {
+    if (fs.existsSync(dbFile)) {
       try {
-        const stats = fs.statSync(dbPath);
-        if (stats.isDirectory()) {
-          // Count database files and estimate vectors
-          const files = fs.readdirSync(dbPath);
-          namespaces = files.filter(f => f.endsWith('.db') || f.endsWith('.sqlite')).length;
-
-          // Calculate total size
-          for (const file of files) {
-            const filePath = path.join(dbPath, file);
-            const fileStat = fs.statSync(filePath);
-            if (fileStat.isFile()) {
-              dbSizeKB += fileStat.size / 1024;
-            }
-          }
-
-          // Estimate vector count (~0.5KB per vector on average)
-          vectorCount = Math.floor(dbSizeKB / 0.5);
-        } else {
-          // Single file database
-          dbSizeKB = stats.size / 1024;
-          vectorCount = Math.floor(dbSizeKB / 0.5);
-          namespaces = 1;
-        }
+        const stats = fs.statSync(dbFile);
+        dbSizeKB = stats.size / 1024;
+        // Estimate vectors: ~2KB per vector for SQLite with embeddings
+        vectorCount = Math.floor(dbSizeKB / 2);
+        namespaces = 1;
         break;
       } catch (e) {
         // Ignore
       }
+    }
+  }
+
+  // Check database directories if no direct file found
+  if (vectorCount === 0) {
+    for (const dbPath of dbDirPaths) {
+      if (fs.existsSync(dbPath)) {
+        try {
+          const stats = fs.statSync(dbPath);
+          if (stats.isDirectory()) {
+            const files = fs.readdirSync(dbPath);
+            namespaces = files.filter(f => f.endsWith('.db') || f.endsWith('.sqlite')).length;
+
+            for (const file of files) {
+              const filePath = path.join(dbPath, file);
+              const fileStat = fs.statSync(filePath);
+              if (fileStat.isFile()) {
+                dbSizeKB += fileStat.size / 1024;
+              }
+            }
+
+            vectorCount = Math.floor(dbSizeKB / 2);
+          }
+          break;
+        } catch (e) {
+          // Ignore
+        }
+      }
+    }
+  }
+
+  // Check for HNSW index (indicates vector search capability)
+  for (const hnswPath of hnswPaths) {
+    if (fs.existsSync(hnswPath)) {
+      hasHnsw = true;
+      try {
+        const stats = fs.statSync(hnswPath);
+        // HNSW index: ~0.5KB per vector
+        const hnswVectors = Math.floor(stats.size / 1024 / 0.5);
+        vectorCount = Math.max(vectorCount, hnswVectors);
+      } catch (e) {
+        // Ignore
+      }
+      break;
     }
   }
 
@@ -560,7 +606,7 @@ function getAgentDBStats() {
     }
   }
 
-  return { vectorCount, dbSizeKB: Math.floor(dbSizeKB), namespaces };
+  return { vectorCount, dbSizeKB: Math.floor(dbSizeKB), namespaces, hasHnsw };
 }
 
 // Get test statistics
