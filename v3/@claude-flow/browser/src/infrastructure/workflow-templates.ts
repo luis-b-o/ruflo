@@ -209,12 +209,12 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       { name: 'fields', type: 'string', required: true, description: 'JSON object mapping field names to sub-selectors' },
     ],
     steps: [
-      { id: 'navigate', action: 'open', target: '${url}', waitAfter: 1000 },
-      { id: 'wait-items', action: 'wait', target: '${itemSelector}' },
+      { id: 'navigate', action: 'open', target: '\${url}', waitAfter: 1000 },
+      { id: 'wait-items', action: 'wait', target: '\${itemSelector}' },
       { id: 'extract-items', action: 'eval', value: `
         (() => {
-          const items = document.querySelectorAll('${itemSelector}');
-          const fields = JSON.parse('${fields}');
+          const items = document.querySelectorAll('\${itemSelector}');
+          const fields = JSON.parse('\${fields}');
 
           return Array.from(items).map(item => {
             const result = {};
