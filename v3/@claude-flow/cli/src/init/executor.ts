@@ -231,6 +231,138 @@ export async function executeInit(options: InitOptions): Promise<InitResult> {
 }
 
 /**
+ * Upgrade result interface
+ */
+export interface UpgradeResult {
+  success: boolean;
+  updated: string[];
+  created: string[];
+  preserved: string[];
+  errors: string[];
+}
+
+/**
+ * Execute upgrade - updates helpers and creates missing metrics without losing data
+ * This is safe for existing users who want the latest statusline fixes
+ */
+export async function executeUpgrade(targetDir: string): Promise<UpgradeResult> {
+  const platform = detectPlatform();
+
+  const result: UpgradeResult = {
+    success: true,
+    updated: [],
+    created: [],
+    preserved: [],
+    errors: [],
+  };
+
+  try {
+    // Ensure required directories exist
+    const dirs = [
+      '.claude/helpers',
+      '.claude-flow/metrics',
+      '.claude-flow/security',
+      '.claude-flow/learning',
+    ];
+
+    for (const dir of dirs) {
+      const fullPath = path.join(targetDir, dir);
+      if (!fs.existsSync(fullPath)) {
+        fs.mkdirSync(fullPath, { recursive: true });
+      }
+    }
+
+    // 1. ALWAYS update statusline helper (force overwrite)
+    const statuslinePath = path.join(targetDir, '.claude', 'helpers', 'statusline.cjs');
+    const statuslineContent = generateStatuslineScript({ refreshInterval: 5000 });
+
+    if (fs.existsSync(statuslinePath)) {
+      result.updated.push('.claude/helpers/statusline.cjs');
+    } else {
+      result.created.push('.claude/helpers/statusline.cjs');
+    }
+    fs.writeFileSync(statuslinePath, statuslineContent, 'utf-8');
+
+    // 2. Create MISSING metrics files only (preserve existing data)
+    const metricsDir = path.join(targetDir, '.claude-flow', 'metrics');
+    const securityDir = path.join(targetDir, '.claude-flow', 'security');
+
+    // v3-progress.json
+    const progressPath = path.join(metricsDir, 'v3-progress.json');
+    if (!fs.existsSync(progressPath)) {
+      const progress = {
+        version: '3.0.0',
+        initialized: new Date().toISOString(),
+        domains: { completed: 0, total: 5, status: 'INITIALIZING' },
+        ddd: { progress: 0, modules: 0, totalFiles: 0, totalLines: 0 },
+        swarm: { activeAgents: 0, maxAgents: 15, topology: 'hierarchical-mesh' },
+        learning: { status: 'READY', patternsLearned: 0, sessionsCompleted: 0 },
+        _note: 'Metrics will update as you use Claude Flow'
+      };
+      fs.writeFileSync(progressPath, JSON.stringify(progress, null, 2), 'utf-8');
+      result.created.push('.claude-flow/metrics/v3-progress.json');
+    } else {
+      result.preserved.push('.claude-flow/metrics/v3-progress.json');
+    }
+
+    // swarm-activity.json
+    const activityPath = path.join(metricsDir, 'swarm-activity.json');
+    if (!fs.existsSync(activityPath)) {
+      const activity = {
+        timestamp: new Date().toISOString(),
+        processes: { agentic_flow: 0, mcp_server: 0, estimated_agents: 0 },
+        swarm: { active: false, agent_count: 0, coordination_active: false },
+        integration: { agentic_flow_active: false, mcp_active: false },
+        _initialized: true
+      };
+      fs.writeFileSync(activityPath, JSON.stringify(activity, null, 2), 'utf-8');
+      result.created.push('.claude-flow/metrics/swarm-activity.json');
+    } else {
+      result.preserved.push('.claude-flow/metrics/swarm-activity.json');
+    }
+
+    // learning.json
+    const learningPath = path.join(metricsDir, 'learning.json');
+    if (!fs.existsSync(learningPath)) {
+      const learning = {
+        initialized: new Date().toISOString(),
+        routing: { accuracy: 0, decisions: 0 },
+        patterns: { shortTerm: 0, longTerm: 0, quality: 0 },
+        sessions: { total: 0, current: null },
+        _note: 'Intelligence grows as you use Claude Flow'
+      };
+      fs.writeFileSync(learningPath, JSON.stringify(learning, null, 2), 'utf-8');
+      result.created.push('.claude-flow/metrics/learning.json');
+    } else {
+      result.preserved.push('.claude-flow/metrics/learning.json');
+    }
+
+    // audit-status.json
+    const auditPath = path.join(securityDir, 'audit-status.json');
+    if (!fs.existsSync(auditPath)) {
+      const audit = {
+        initialized: new Date().toISOString(),
+        status: 'PENDING',
+        cvesFixed: 0,
+        totalCves: 3,
+        lastScan: null,
+        _note: 'Run: npx @claude-flow/cli@latest security scan'
+      };
+      fs.writeFileSync(auditPath, JSON.stringify(audit, null, 2), 'utf-8');
+      result.created.push('.claude-flow/security/audit-status.json');
+    } else {
+      result.preserved.push('.claude-flow/security/audit-status.json');
+    }
+
+  } catch (error) {
+    result.success = false;
+    result.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  return result;
+}
+
+/**
  * Create directory structure
  */
 async function createDirectories(
