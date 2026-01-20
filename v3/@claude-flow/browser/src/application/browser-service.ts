@@ -402,6 +402,42 @@ export class BrowserService {
   getAdapter(): AgentBrowserAdapter {
     return this.adapter;
   }
+
+  /**
+   * Get memory manager for direct memory operations
+   */
+  getMemoryManager(): BrowserMemoryManager | undefined {
+    return this.memoryManager;
+  }
+
+  /**
+   * Get security scanner for direct security operations
+   */
+  getSecurityScanner(): BrowserSecurityScanner | undefined {
+    return this.securityScanner;
+  }
+
+  /**
+   * Find similar trajectories for a goal (uses HNSW search)
+   */
+  async findSimilarTrajectories(goal: string, topK = 5): Promise<BrowserTrajectory[]> {
+    if (!this.memoryManager) return [];
+    return this.memoryManager.findSimilarTrajectories(goal, topK);
+  }
+
+  /**
+   * Get session memory statistics
+   */
+  async getMemoryStats(): Promise<{
+    trajectories: number;
+    patterns: number;
+    snapshots: number;
+    errors: number;
+    successRate: number;
+  } | null> {
+    if (!this.memoryManager) return null;
+    return this.memoryManager.getSessionStats();
+  }
 }
 
 // ============================================================================
