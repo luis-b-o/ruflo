@@ -5469,7 +5469,7 @@ CLAUDE_FLOW_HNSW_EF=200
 ---
 
 <details>
-<summary><h2>📄 Configuration Reference </h2></summary>
+<summary>📄 <strong>Configuration Reference</strong></summary>
 
 ### Configuration File Location
 
