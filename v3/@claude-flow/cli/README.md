@@ -1352,7 +1352,7 @@ npx claude-flow@v3alpha worker status
 
 | Command | Subcommands | Description |
 |---------|-------------|-------------|
-| `init` | 4 | Project initialization (wizard, check, skills, hooks) |
+| `init` | 5 | Project initialization (wizard, check, skills, hooks, upgrade) |
 | `agent` | 8 | Agent lifecycle (spawn, list, status, stop, metrics, pool, health, logs) |
 | `swarm` | 6 | Swarm coordination (init, start, status, stop, scale, coordinate) |
 | `memory` | 11 | Memory operations (store, retrieve, search, list, delete, stats, configure, cleanup, compress, export, import) |
