@@ -1896,7 +1896,7 @@ Shell-based daemons for monitoring (Linux/macOS only):
 ---
 
 <details>
-<summary><h2>🎯 Use Cases — Real-world scenarios and how to solve them</h2></summary>
+<summary>🎯 <strong>Use Cases</strong> — Real-world scenarios and how to solve them</summary>
 
 ### 👨‍💻 Development & Code Quality
 
