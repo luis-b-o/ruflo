@@ -130,6 +130,7 @@ interface ComponentHealth {
   status?: 'healthy' | 'degraded' | 'unhealthy';
   message?: string;
   lastCheck: number;
+  lastSuccess?: number;
 }
 
 /**
