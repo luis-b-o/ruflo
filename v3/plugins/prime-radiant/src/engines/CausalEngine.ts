@@ -15,7 +15,7 @@ import type {
   CausalGraph,
   Intervention,
   WasmModule
-} from '../types';
+} from '../types.js';
 
 /**
  * CausalEngine - WASM wrapper for causal inference operations
