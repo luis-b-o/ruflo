@@ -13,9 +13,8 @@ import type {
   ICategoryEngine,
   Morphism,
   MorphismResult,
-  Functor,
   WasmModule
-} from '../types';
+} from '../types.js';
 
 /**
  * CategoryEngine - WASM wrapper for category theory operations
