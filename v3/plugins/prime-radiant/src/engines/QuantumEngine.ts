@@ -357,12 +357,12 @@ export class QuantumEngine implements IQuantumEngine {
     const points: PersistencePoint[] = [];
 
     // Format: [numPoints, birth1, death1, dim1, birth2, death2, dim2, ...]
-    const numPoints = result[0];
+    const numPoints = result[0] ?? 0;
 
     for (let i = 0; i < numPoints; i++) {
-      const birth = result[1 + i * 3];
-      const death = result[2 + i * 3];
-      const dimension = result[3 + i * 3];
+      const birth = result[1 + i * 3] ?? 0;
+      const death = result[2 + i * 3] ?? 0;
+      const dimension = result[3 + i * 3] ?? 0;
 
       points.push({
         birth,
