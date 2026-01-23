@@ -147,9 +147,9 @@ export type {
   IQEMemoryBridge,
   LearningTrajectory,
   LearningStep,
-  TestPattern,
+  TestPattern as ITestPattern,
   PatternFilters,
-  CoverageGap,
+  CoverageGap as ICoverageGap,
   QEMemoryStats,
 
   IQESecurityBridge,
@@ -171,7 +171,7 @@ export type {
   TaskHandle,
   TaskResult,
   TaskProgress,
-  QualityGate,
+  QualityGate as IQualityGate,
   QualityGateCriteria,
   QualityMetrics,
   WorkflowResult,
@@ -187,7 +187,7 @@ export type {
 
   IQEModelRoutingAdapter,
   QETask,
-  ModelTier,
+  ModelTier as IModelTier,
   ModelSelection,
   QERouteResult,
 
