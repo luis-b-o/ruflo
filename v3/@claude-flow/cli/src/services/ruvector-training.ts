@@ -652,8 +652,15 @@ export function resetTraining(): void {
   if (scopedLoRA) scopedLoRA.reset_all();
   if (trajectoryBuffer) trajectoryBuffer.reset();
 
+  // Reset SONA stats (engine doesn't have reset, just flush)
+  if (sonaEngine) {
+    sonaEngine.flush();
+  }
+
   totalAdaptations = 0;
   totalForwards = 0;
+  totalSonaLearns = 0;
+  totalSonaSearches = 0;
 }
 
 /**
