@@ -1,13 +1,22 @@
-//! Critical Path Analysis
+//! Ultra-Optimized Critical Path Analysis
 //!
-//! Computes the critical path through a dependency graph.
-//! 150x faster than JavaScript implementation.
+//! Target: <0.2ms for critical path computation (500x faster than JavaScript)
+//!
+//! Optimizations:
+//! - Forward/backward pass with pre-allocated arrays
+//! - FxHash for O(1) lookups
+//! - Single-pass duration aggregation
+//! - Cache-friendly memory layout
 
 use wasm_bindgen::prelude::*;
-use std::collections::HashMap;
+use gastown_shared::{FxHashMap, pool::SmallBuffer};
 use crate::{BeadNode, CriticalPathResult};
 
 /// Compute critical path through bead dependencies
+///
+/// # Performance
+/// Target: <0.2ms
+#[inline]
 pub fn critical_path_impl(beads_json: &str) -> Result<String, JsValue> {
     let beads: Vec<BeadNode> = serde_json::from_str(beads_json)
         .map_err(|e| JsValue::from_str(&format!("Parse error: {}", e)))?;
@@ -19,91 +28,102 @@ pub fn critical_path_impl(beads_json: &str) -> Result<String, JsValue> {
 }
 
 /// Internal critical path computation using forward and backward pass
+///
+/// Uses pre-allocated arrays for cache efficiency
+#[inline]
 fn critical_path_internal(beads: &[BeadNode]) -> Result<CriticalPathResult, JsValue> {
     if beads.is_empty() {
         return Ok(CriticalPathResult {
             path: vec![],
             total_duration: 0,
-            slack: HashMap::new(),
+            slack: FxHashMap::default(),
         });
     }
 
-    // Build lookup maps
-    let mut id_to_bead: HashMap<&str, &BeadNode> = HashMap::new();
-    let mut id_to_duration: HashMap<&str, u32> = HashMap::new();
+    let n = beads.len();
 
-    for bead in beads {
-        id_to_bead.insert(&bead.id, bead);
-        id_to_duration.insert(&bead.id, bead.duration.unwrap_or(1));
+    // Build lookup maps
+    let mut id_to_index: FxHashMap<&str, usize> = FxHashMap::default();
+    id_to_index.reserve(n);
+
+    let mut durations: Vec<u32> = Vec::with_capacity(n);
+
+    for (i, bead) in beads.iter().enumerate() {
+        id_to_index.insert(&bead.id, i);
+        durations.push(bead.duration.unwrap_or(1));
     }
 
     // Find topological order using Kahn's algorithm
-    let topo_order = topo_sort_kahn(beads)?;
+    let topo_order = topo_sort_kahn_indices(beads, &id_to_index)?;
 
     // Forward pass: compute earliest start and finish times
-    let mut earliest_start: HashMap<String, u32> = HashMap::new();
-    let mut earliest_finish: HashMap<String, u32> = HashMap::new();
+    let mut earliest_start: Vec<u32> = vec![0; n];
+    let mut earliest_finish: Vec<u32> = vec![0; n];
 
-    for id in &topo_order {
-        let bead = id_to_bead.get(id.as_str()).unwrap();
+    for &i in &topo_order {
+        let bead = &beads[i];
         let es = if bead.blocked_by.is_empty() {
             0
         } else {
             bead.blocked_by.iter()
-                .filter_map(|dep| earliest_finish.get(dep))
+                .filter_map(|dep| id_to_index.get(dep.as_str()))
+                .map(|&j| earliest_finish[j])
                 .max()
-                .copied()
                 .unwrap_or(0)
         };
-        let duration = *id_to_duration.get(id.as_str()).unwrap_or(&1);
-        let ef = es + duration;
-
-        earliest_start.insert(id.clone(), es);
-        earliest_finish.insert(id.clone(), ef);
+        earliest_start[i] = es;
+        earliest_finish[i] = es + durations[i];
     }
 
     // Find project completion time
-    let project_duration = earliest_finish.values().max().copied().unwrap_or(0);
+    let project_duration = earliest_finish.iter().max().copied().unwrap_or(0);
 
     // Backward pass: compute latest start and finish times
-    let mut latest_finish: HashMap<String, u32> = HashMap::new();
-    let mut latest_start: HashMap<String, u32> = HashMap::new();
+    let mut latest_finish: Vec<u32> = vec![project_duration; n];
+    let mut latest_start: Vec<u32> = vec![0; n];
 
-    for id in topo_order.iter().rev() {
-        let bead = id_to_bead.get(id.as_str()).unwrap();
-        let lf = if bead.blocks.is_empty() {
-            project_duration
-        } else {
-            bead.blocks.iter()
-                .filter_map(|succ| latest_start.get(succ))
-                .min()
-                .copied()
-                .unwrap_or(project_duration)
-        };
-        let duration = *id_to_duration.get(id.as_str()).unwrap_or(&1);
-        let ls = lf.saturating_sub(duration);
-
-        latest_finish.insert(id.clone(), lf);
-        latest_start.insert(id.clone(), ls);
-    }
-
-    // Compute slack and find critical path
-    let mut slack: HashMap<String, u32> = HashMap::new();
-    let mut critical_nodes: Vec<String> = Vec::new();
-
-    for id in &topo_order {
-        let es = earliest_start.get(id).copied().unwrap_or(0);
-        let ls = latest_start.get(id).copied().unwrap_or(0);
-        let s = ls.saturating_sub(es);
-        slack.insert(id.clone(), s);
-
-        if s == 0 {
-            critical_nodes.push(id.clone());
+    // Build successors map for backward pass
+    let mut successors: Vec<SmallBuffer<usize, 8>> = vec![SmallBuffer::new(); n];
+    for bead in beads {
+        if let Some(&i) = id_to_index.get(bead.id.as_str()) {
+            for blocked in &bead.blocks {
+                if let Some(&j) = id_to_index.get(blocked.as_str()) {
+                    successors[i].push(j);
+                }
+            }
         }
     }
 
-    // Build critical path (following dependencies)
-    let path = build_critical_path(&critical_nodes, beads);
+    for &i in topo_order.iter().rev() {
+        let lf = if successors[i].is_empty() {
+            project_duration
+        } else {
+            successors[i].iter()
+                .map(|&j| latest_start[j])
+                .min()
+                .unwrap_or(project_duration)
+        };
+        latest_finish[i] = lf;
+        latest_start[i] = lf.saturating_sub(durations[i]);
+    }
+
+    // Compute slack and find critical path
+    let mut slack: FxHashMap<String, u32> = FxHashMap::default();
+    slack.reserve(n);
+
+    let mut critical_indices: Vec<usize> = Vec::new();
+
+    for i in 0..n {
+        let s = latest_start[i].saturating_sub(earliest_start[i]);
+        slack.insert(beads[i].id.clone(), s);
+
+        if s == 0 {
+            critical_indices.push(i);
+        }
+    }
+
+    // Build critical path (following dependencies through critical nodes)
+    let path = build_critical_path_optimized(&critical_indices, beads, &id_to_index, &successors);
 
     Ok(CriticalPathResult {
         path,
@@ -112,49 +132,49 @@ fn critical_path_internal(beads: &[BeadNode]) -> Result<CriticalPathResult, JsVa
     })
 }
 
-/// Topological sort using Kahn's algorithm
-fn topo_sort_kahn(beads: &[BeadNode]) -> Result<Vec<String>, JsValue> {
-    let mut in_degree: HashMap<String, usize> = HashMap::new();
-    let mut successors: HashMap<String, Vec<String>> = HashMap::new();
+/// Topological sort using Kahn's algorithm returning indices
+#[inline]
+fn topo_sort_kahn_indices(beads: &[BeadNode], id_to_index: &FxHashMap<&str, usize>) -> Result<Vec<usize>, JsValue> {
+    let n = beads.len();
 
-    for bead in beads {
-        in_degree.entry(bead.id.clone()).or_insert(0);
-        successors.entry(bead.id.clone()).or_insert_with(Vec::new);
+    // Compute in-degrees
+    let mut in_degree: Vec<usize> = vec![0; n];
+    let mut successors: Vec<SmallBuffer<usize, 8>> = vec![SmallBuffer::new(); n];
 
-        for blocker in &bead.blocked_by {
-            *in_degree.entry(bead.id.clone()).or_insert(0) += 1;
-            successors.entry(blocker.clone())
-                .or_insert_with(Vec::new)
-                .push(bead.id.clone());
-        }
-    }
+    for (i, bead) in beads.iter().enumerate() {
+        in_degree[i] = bead.blocked_by.len();
 
-    let mut queue: std::collections::VecDeque<String> = std::collections::VecDeque::new();
-    for (id, &deg) in &in_degree {
-        if deg == 0 {
-            queue.push_back(id.clone());
-        }
-    }
-
-    let mut result = Vec::new();
-    let mut in_degree_copy = in_degree.clone();
-
-    while let Some(id) = queue.pop_front() {
-        result.push(id.clone());
-
-        if let Some(succs) = successors.get(&id) {
-            for succ in succs {
-                if let Some(deg) = in_degree_copy.get_mut(succ) {
-                    *deg -= 1;
-                    if *deg == 0 {
-                        queue.push_back(succ.clone());
-                    }
-                }
+        for blocked in &bead.blocks {
+            if let Some(&j) = id_to_index.get(blocked.as_str()) {
+                successors[i].push(j);
             }
         }
     }
 
-    if result.len() != beads.len() {
+    // Initialize queue with nodes that have no dependencies
+    let mut queue: std::collections::VecDeque<usize> = std::collections::VecDeque::with_capacity(n);
+
+    for i in 0..n {
+        if in_degree[i] == 0 {
+            queue.push_back(i);
+        }
+    }
+
+    // Process nodes in topological order
+    let mut result: Vec<usize> = Vec::with_capacity(n);
+
+    while let Some(i) = queue.pop_front() {
+        result.push(i);
+
+        for &j in &successors[i] {
+            in_degree[j] -= 1;
+            if in_degree[j] == 0 {
+                queue.push_back(j);
+            }
+        }
+    }
+
+    if result.len() != n {
         return Err(JsValue::from_str("Cycle detected in dependency graph"));
     }
 
@@ -162,54 +182,53 @@ fn topo_sort_kahn(beads: &[BeadNode]) -> Result<Vec<String>, JsValue> {
 }
 
 /// Build the critical path by following dependencies through critical nodes
-fn build_critical_path(critical_nodes: &[String], beads: &[BeadNode]) -> Vec<String> {
-    if critical_nodes.is_empty() {
+#[inline]
+fn build_critical_path_optimized(
+    critical_indices: &[usize],
+    beads: &[BeadNode],
+    id_to_index: &FxHashMap<&str, usize>,
+    successors: &[SmallBuffer<usize, 8>],
+) -> Vec<String> {
+    if critical_indices.is_empty() {
         return vec![];
     }
 
-    // Build lookup
-    let mut id_to_bead: HashMap<&str, &BeadNode> = HashMap::new();
-    for bead in beads {
-        id_to_bead.insert(&bead.id, bead);
-    }
+    let critical_set: std::collections::HashSet<usize> = critical_indices.iter().copied().collect();
 
-    let critical_set: std::collections::HashSet<_> = critical_nodes.iter().collect();
-
-    // Find starting node (no critical dependencies)
+    // Find starting node (critical node with no critical dependencies)
     let mut start = None;
-    for id in critical_nodes {
-        if let Some(bead) = id_to_bead.get(id.as_str()) {
-            let has_critical_dep = bead.blocked_by.iter()
-                .any(|dep| critical_set.contains(dep));
-            if !has_critical_dep {
-                start = Some(id.clone());
-                break;
-            }
+    for &i in critical_indices {
+        let has_critical_dep = beads[i].blocked_by.iter()
+            .filter_map(|dep| id_to_index.get(dep.as_str()))
+            .any(|&j| critical_set.contains(&j));
+
+        if !has_critical_dep {
+            start = Some(i);
+            break;
         }
     }
 
-    let Some(start_id) = start else {
-        // If no clear start, return critical nodes in order
-        return critical_nodes.to_vec();
+    let Some(start_idx) = start else {
+        // If no clear start, return first critical node
+        return critical_indices.iter()
+            .map(|&i| beads[i].id.clone())
+            .collect();
     };
 
     // Build path by following critical successors
-    let mut path = vec![start_id.clone()];
-    let mut current = start_id;
+    let mut path = vec![beads[start_idx].id.clone()];
+    let mut current = start_idx;
 
     loop {
-        let Some(bead) = id_to_bead.get(current.as_str()) else {
-            break;
-        };
-
         // Find critical successor
-        let critical_succ = bead.blocks.iter()
-            .find(|succ| critical_set.contains(succ));
+        let critical_succ = successors[current].iter()
+            .copied()
+            .find(|&j| critical_set.contains(&j));
 
         match critical_succ {
-            Some(succ) => {
-                path.push(succ.clone());
-                current = succ.clone();
+            Some(j) => {
+                path.push(beads[j].id.clone());
+                current = j;
             }
             None => break,
         }
@@ -310,5 +329,37 @@ mod tests {
         assert_eq!(result.slack.get("a"), Some(&20));
         assert_eq!(result.slack.get("b"), Some(&0));
         assert_eq!(result.slack.get("c"), Some(&0));
+    }
+
+    #[test]
+    fn test_empty_beads() {
+        let beads: Vec<BeadNode> = vec![];
+        let result = critical_path_internal(&beads).unwrap();
+
+        assert_eq!(result.total_duration, 0);
+        assert!(result.path.is_empty());
+        assert!(result.slack.is_empty());
+    }
+
+    #[test]
+    fn test_single_bead() {
+        let beads = vec![
+            BeadNode {
+                id: "only".to_string(),
+                title: "Only".to_string(),
+                status: "open".to_string(),
+                priority: 0,
+                blocked_by: vec![],
+                blocks: vec![],
+                duration: Some(42),
+            },
+        ];
+
+        let result = critical_path_internal(&beads).unwrap();
+
+        assert_eq!(result.total_duration, 42);
+        assert_eq!(result.path.len(), 1);
+        assert_eq!(result.path[0], "only");
+        assert_eq!(result.slack.get("only"), Some(&0));
     }
 }
