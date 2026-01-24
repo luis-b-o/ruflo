@@ -120,10 +120,13 @@ Seamlessly sync between Gas Town's Beads and Claude Flow's AgentDB:
 ## Installation
 
 ```bash
-# Install the plugin
+# Install via Claude Flow CLI (recommended)
+npx claude-flow@latest plugins install -n @claude-flow/plugin-gastown-bridge
+
+# Or install directly via npm
 npm install @claude-flow/plugin-gastown-bridge
 
-# Prerequisites: Gas Town and Beads CLI
+# Prerequisites: Gas Town and Beads CLI (optional - for full CLI integration)
 # See: https://github.com/steveyegge/gastown
 go install github.com/steveyegge/gastown/cmd/gt@latest
 go install github.com/steveyegge/beads/cmd/bd@latest
