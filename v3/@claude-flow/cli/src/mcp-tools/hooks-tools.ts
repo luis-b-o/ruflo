@@ -105,6 +105,132 @@ async function getMoERouter() {
   return moeRouter;
 }
 
+// Semantic Router - lazy loaded (pure JS, 47k routes/s)
+let semanticRouter: import('../ruvector/semantic-router.js').SemanticRouter | null = null;
+let semanticRouterInitialized = false;
+
+// Pre-computed embeddings for common task patterns (cached)
+const TASK_PATTERN_EMBEDDINGS: Map<string, Float32Array> = new Map();
+
+function generateSimpleEmbedding(text: string, dimension: number = 384): Float32Array {
+  // Simple deterministic embedding based on character codes
+  // This is for routing purposes where we need consistent, fast embeddings
+  const embedding = new Float32Array(dimension);
+  const normalized = text.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+  const words = normalized.split(/\s+/).filter(w => w.length > 0);
+
+  // Combine word-level and character-level features
+  for (let i = 0; i < dimension; i++) {
+    let value = 0;
+
+    // Word-level features
+    for (let w = 0; w < words.length; w++) {
+      const word = words[w];
+      for (let c = 0; c < word.length; c++) {
+        const charCode = word.charCodeAt(c);
+        value += Math.sin((charCode * (i + 1) + w * 17 + c * 23) * 0.0137);
+      }
+    }
+
+    // Character-level features
+    for (let c = 0; c < text.length; c++) {
+      value += Math.cos((text.charCodeAt(c) * (i + 1) + c * 7) * 0.0073);
+    }
+
+    embedding[i] = value / Math.max(1, text.length);
+  }
+
+  // Normalize
+  let norm = 0;
+  for (let i = 0; i < dimension; i++) {
+    norm += embedding[i] * embedding[i];
+  }
+  norm = Math.sqrt(norm);
+  if (norm > 0) {
+    for (let i = 0; i < dimension; i++) {
+      embedding[i] /= norm;
+    }
+  }
+
+  return embedding;
+}
+
+async function getSemanticRouter() {
+  if (!semanticRouter && !semanticRouterInitialized) {
+    semanticRouterInitialized = true;
+    try {
+      const { SemanticRouter } = await import('../ruvector/semantic-router.js');
+      semanticRouter = new SemanticRouter({ dimension: 384 });
+
+      // Initialize with task patterns
+      const patterns: Record<string, { keywords: string[]; agents: string[] }> = {
+        'security-task': {
+          keywords: ['authentication', 'security', 'auth', 'password', 'encryption', 'vulnerability', 'cve', 'audit'],
+          agents: ['security-architect', 'security-auditor', 'reviewer'],
+        },
+        'testing-task': {
+          keywords: ['test', 'testing', 'spec', 'coverage', 'unit test', 'integration test', 'e2e'],
+          agents: ['tester', 'reviewer'],
+        },
+        'api-task': {
+          keywords: ['api', 'endpoint', 'rest', 'graphql', 'route', 'handler', 'controller'],
+          agents: ['architect', 'coder', 'tester'],
+        },
+        'performance-task': {
+          keywords: ['performance', 'optimize', 'speed', 'memory', 'benchmark', 'profiling', 'bottleneck'],
+          agents: ['performance-engineer', 'coder', 'tester'],
+        },
+        'refactor-task': {
+          keywords: ['refactor', 'restructure', 'clean', 'organize', 'modular', 'decouple'],
+          agents: ['architect', 'coder', 'reviewer'],
+        },
+        'bugfix-task': {
+          keywords: ['bug', 'fix', 'error', 'issue', 'broken', 'crash', 'debug'],
+          agents: ['coder', 'tester', 'reviewer'],
+        },
+        'feature-task': {
+          keywords: ['feature', 'implement', 'add', 'new', 'create', 'build'],
+          agents: ['architect', 'coder', 'tester'],
+        },
+        'database-task': {
+          keywords: ['database', 'sql', 'query', 'schema', 'migration', 'orm'],
+          agents: ['architect', 'coder', 'tester'],
+        },
+        'frontend-task': {
+          keywords: ['frontend', 'ui', 'component', 'react', 'css', 'style', 'layout'],
+          agents: ['coder', 'reviewer', 'tester'],
+        },
+        'devops-task': {
+          keywords: ['deploy', 'ci', 'cd', 'pipeline', 'docker', 'kubernetes', 'infrastructure'],
+          agents: ['devops', 'coder', 'tester'],
+        },
+        'swarm-task': {
+          keywords: ['swarm', 'agent', 'coordinator', 'hive', 'mesh', 'topology'],
+          agents: ['swarm-specialist', 'coordinator', 'architect'],
+        },
+        'memory-task': {
+          keywords: ['memory', 'cache', 'store', 'vector', 'embedding', 'persistence'],
+          agents: ['memory-specialist', 'architect', 'coder'],
+        },
+      };
+
+      for (const [patternName, { keywords, agents }] of Object.entries(patterns)) {
+        const embeddings = keywords.map(kw => generateSimpleEmbedding(kw));
+        semanticRouter.addIntentWithEmbeddings(patternName, embeddings, { agents, keywords });
+
+        // Cache embeddings for keywords
+        keywords.forEach((kw, i) => {
+          TASK_PATTERN_EMBEDDINGS.set(kw, embeddings[i]);
+        });
+      }
+
+    } catch {
+      semanticRouter = null;
+    }
+  }
+  return semanticRouter;
+}
+
 // Flash Attention - lazy loaded
 let flashAttention: Awaited<ReturnType<typeof import('../ruvector/flash-attention.js').getFlashAttention>> | null = null;
 async function getFlashAttention() {
