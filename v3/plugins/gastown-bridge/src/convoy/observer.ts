@@ -230,7 +230,19 @@ export class ConvoyObserver extends EventEmitter {
     timer: NodeJS.Timeout;
     callback: CompletionCallback;
     attempts: number;
+    currentInterval: number;
+    lastState: string | null;
   }> = new Map();
+
+  // Performance optimization caches
+  private readonly beadCache: LRUCache<string, Bead>;
+  private readonly completionCache: LRUCache<string, CompletionCheckResult>;
+  private readonly fetchDedup: BatchDeduplicator<Bead[]>;
+  private readonly progressEmitters: Map<string, DebouncedEmitter<ConvoyProgress>>;
+
+  // Subscription batching
+  private pendingSubscriptions: Map<string, Set<CompletionCallback>> = new Map();
+  private subscriptionFlushTimer: NodeJS.Timeout | null = null;
 
   constructor(config: ConvoyObserverConfig, logger?: ObserverLogger) {
     super();
@@ -242,7 +254,26 @@ export class ConvoyObserver extends EventEmitter {
       pollInterval: config.pollInterval ?? 10000,
       maxPollAttempts: config.maxPollAttempts ?? 0, // 0 = unlimited
       useWasm: config.useWasm ?? true,
+      useExponentialBackoff: config.useExponentialBackoff ?? true,
+      maxBackoffInterval: config.maxBackoffInterval ?? 60000, // 1 minute max
+      backoffMultiplier: config.backoffMultiplier ?? 1.5,
+      deltaUpdatesOnly: config.deltaUpdatesOnly ?? true,
+      progressDebounceMs: config.progressDebounceMs ?? 500,
     };
+
+    // Initialize performance caches
+    this.beadCache = new LRUCache<string, Bead>({
+      maxEntries: 1000,
+      ttlMs: 30 * 1000, // 30 seconds (beads change frequently)
+    });
+
+    this.completionCache = new LRUCache<string, CompletionCheckResult>({
+      maxEntries: 100,
+      ttlMs: 5 * 1000, // 5 seconds (completion state changes)
+    });
+
+    this.fetchDedup = new BatchDeduplicator<Bead[]>(30000);
+    this.progressEmitters = new Map();
   }
 
   /**
