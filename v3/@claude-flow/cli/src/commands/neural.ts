@@ -629,7 +629,7 @@ const exportCommand: Command = {
       }
 
       // Add stats metadata
-      exportData.metadata.accuracy = stats.retrievalPrecision || 0.85;
+      exportData.metadata.accuracy = (stats as { retrievalPrecision?: number }).retrievalPrecision || 0.85;
       exportData.metadata.totalUsage = exportData.patterns.reduce((sum, p) => sum + p.usageCount, 0);
 
       spinner.setText('Generating secure signature...');
@@ -644,7 +644,7 @@ const exportCommand: Command = {
           { name: 'Ed25519' },
           true,
           ['sign', 'verify']
-        );
+        ) as CryptoKeyPair;
 
         const exportBytes = new TextEncoder().encode(JSON.stringify(exportData));
         const signatureBytes = await crypto.subtle.sign('Ed25519', keyPair.privateKey, exportBytes);
