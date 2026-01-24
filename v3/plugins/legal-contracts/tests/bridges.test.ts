@@ -243,10 +243,13 @@ describe('DAGBridge', () => {
         },
       ];
 
-      const result = await bridge.detectCycles(obligations);
+      // Build graph first, then detect cycles
+      const graph = await bridge.buildDependencyGraph(obligations);
+      const cycles = await bridge.detectCycles(graph);
 
-      expect(result.hasCycles).toBe(false);
-      expect(result.cycles).toEqual([]);
+      // detectCycles returns string[][] (array of cycle arrays)
+      expect(Array.isArray(cycles)).toBe(true);
+      expect(cycles.length).toBe(0);
     });
 
     it('should detect simple cycle', async () => {
@@ -275,10 +278,13 @@ describe('DAGBridge', () => {
         },
       ];
 
-      const result = await bridge.detectCycles(obligations);
+      // Build graph first, then detect cycles
+      const graph = await bridge.buildDependencyGraph(obligations);
+      const cycles = await bridge.detectCycles(graph);
 
-      expect(result.hasCycles).toBe(true);
-      expect(result.cycles.length).toBeGreaterThan(0);
+      // detectCycles returns string[][] (array of cycle arrays)
+      expect(Array.isArray(cycles)).toBe(true);
+      expect(cycles.length).toBeGreaterThan(0);
     });
   });
 
