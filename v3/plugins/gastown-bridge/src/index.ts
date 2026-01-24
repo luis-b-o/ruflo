@@ -1066,10 +1066,13 @@ export class GasTownBridgePlugin extends EventEmitter implements IPlugin {
     });
     await this.bdBridge.initialize();
 
-    // Initialize SyncBridge
-    this.syncBridge = createSyncBridge({
-      bdBridge: this.bdBridge,
-      namespace: this.config.syncBridge?.namespace ?? 'gastown:beads',
+    // Initialize SyncBridge - requires an AgentDB service
+    // We create a stub AgentDB service that will be replaced when
+    // the plugin context provides a real one
+    const stubAgentDB = this.createStubAgentDB();
+    this.syncBridge = createSyncBridge(stubAgentDB, {
+      beadsBridge: this.config.bdBridge,
+      agentdbNamespace: this.config.syncBridge?.namespace ?? 'gastown:beads',
     });
 
     this.logger.debug('Bridges initialized');
