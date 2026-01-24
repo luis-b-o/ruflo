@@ -135,7 +135,7 @@ export class TestLearningBridge implements LearningBridgeInterface {
     // Train using TD learning
     for (const exp of experiences) {
       const tdError = this.computeTDError(exp, mergedConfig.gamma);
-      this.updatePolicy(exp.state, exp.action, tdError, mergedConfig.learningRate);
+      this.updatePolicyWeights(exp.state, exp.action, tdError, mergedConfig.learningRate);
       totalLoss += Math.abs(tdError);
     }
 
