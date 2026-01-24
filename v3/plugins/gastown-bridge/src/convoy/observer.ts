@@ -686,32 +686,60 @@ export class ConvoyObserver extends EventEmitter {
   }
 
   /**
-   * Fetch beads by IDs
+   * Fetch beads by IDs with caching and batch deduplication
    */
   private async fetchBeads(issueIds: string[]): Promise<Bead[]> {
-    const beads: Bead[] = [];
+    // Create a batch key for deduplication
+    const batchKey = issueIds.sort().join(',');
 
-    for (const id of issueIds) {
-      try {
-        const cliBead = await this.bdBridge.getBead(id);
-        beads.push({
-          id: cliBead.id,
-          title: cliBead.content.slice(0, 100),
-          description: cliBead.content,
-          status: this.mapBeadStatus(cliBead.type),
-          priority: 0,
-          labels: cliBead.tags ?? [],
-          createdAt: cliBead.timestamp ? new Date(cliBead.timestamp) : new Date(),
-          updatedAt: new Date(),
-          blockedBy: cliBead.parentId ? [cliBead.parentId] : [],
-          blocks: [],
-        });
-      } catch {
-        // Skip invalid beads
+    return this.fetchDedup.dedupe(batchKey, async () => {
+      const beads: Bead[] = [];
+      const uncachedIds: string[] = [];
+
+      // Check cache first for each bead
+      for (const id of issueIds) {
+        const cached = this.beadCache.get(id);
+        if (cached) {
+          beads.push(cached);
+        } else {
+          uncachedIds.push(id);
+        }
       }
-    }
 
-    return beads;
+      // Fetch uncached beads in parallel (batch of 10)
+      const batchSize = 10;
+      for (let i = 0; i < uncachedIds.length; i += batchSize) {
+        const batch = uncachedIds.slice(i, i + batchSize);
+        const fetchPromises = batch.map(async (id) => {
+          try {
+            const cliBead = await this.bdBridge.getBead(id);
+            const bead: Bead = {
+              id: cliBead.id,
+              title: cliBead.content.slice(0, 100),
+              description: cliBead.content,
+              status: this.mapBeadStatus(cliBead.type),
+              priority: 0,
+              labels: cliBead.tags ?? [],
+              createdAt: cliBead.timestamp ? new Date(cliBead.timestamp) : new Date(),
+              updatedAt: new Date(),
+              blockedBy: cliBead.parentId ? [cliBead.parentId] : [],
+              blocks: [],
+            };
+            // Cache the bead
+            this.beadCache.set(id, bead);
+            return bead;
+          } catch {
+            // Skip invalid beads
+            return null;
+          }
+        });
+
+        const results = await Promise.all(fetchPromises);
+        beads.push(...results.filter((b): b is Bead => b !== null));
+      }
+
+      return beads;
+    });
   }
 
   /**
