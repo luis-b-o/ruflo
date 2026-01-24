@@ -5,6 +5,8 @@
 **Category:** Practical Vertical Application
 **Author:** Plugin Architecture Team
 **Version:** 1.0.0
+**Deciders:** Plugin Architecture Team, Legal Technology Experts
+**Supersedes:** None
 
 ## Context
 
