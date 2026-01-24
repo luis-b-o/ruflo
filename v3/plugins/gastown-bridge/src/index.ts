@@ -1431,17 +1431,17 @@ export class GasTownBridgePlugin extends EventEmitter implements IPlugin {
       async initialize() {
         if (loader) await loader.initialize();
       },
-      async parseFormula(content, _validate) {
+      async parseFormula(content: string, _validate?: boolean) {
         if (!loader) throw new GasTownError('WASM not initialized', GasTownErrorCode.NOT_INITIALIZED);
         const formula = loader.parseFormula(content);
         return { type: formula.type, name: formula.name, steps: formula.steps ?? [] };
       },
-      async cookFormula(formula, vars, _isContent) {
+      async cookFormula(formula: Formula | string, vars: Record<string, string>, _isContent?: boolean) {
         if (!loader) throw new GasTownError('WASM not initialized', GasTownErrorCode.NOT_INITIALIZED);
         const parsed = typeof formula === 'string' ? loader.parseFormula(formula) : formula;
         return loader.cookFormula(parsed, vars);
       },
-      async cookBatch(formulas, vars, _continueOnError) {
+      async cookBatch(formulas: Array<{ name: string; content: string }>, vars: Record<string, string>[], _continueOnError?: boolean) {
         if (!loader) throw new GasTownError('WASM not initialized', GasTownErrorCode.NOT_INITIALIZED);
         const parsedFormulas = formulas.map(f => loader.parseFormula(f.content));
         const cooked = loader.batchCook(parsedFormulas, vars);
