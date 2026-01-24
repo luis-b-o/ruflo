@@ -448,6 +448,20 @@ const statusCommand: Command = {
               : 'Not initialized',
           },
           {
+            component: 'RuVector WASM',
+            status: ruvectorStats.initialized ? output.success('Active') : output.dim('Not loaded'),
+            details: ruvectorStats.initialized
+              ? `MicroLoRA: ${ruvectorStats.totalAdaptations} adapts`
+              : 'Call neural train to initialize',
+          },
+          {
+            component: 'SONA Engine',
+            status: sonaAvailable ? output.success('Active') : output.dim('Not loaded'),
+            details: sonaAvailable && ruvectorStats.sonaStats
+              ? `${ruvectorStats.sonaStats.totalLearns} learns, ${ruvectorStats.sonaStats.totalSearches} searches`
+              : 'Optional, enable with --sona',
+          },
+          {
             component: 'ReasoningBank',
             status: stats.reasoningBankSize > 0 ? output.success('Active') : output.dim('Empty'),
             details: `${stats.patternsLearned} patterns stored`,
