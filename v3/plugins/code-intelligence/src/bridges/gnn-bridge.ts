@@ -496,7 +496,7 @@ export class GNNBridge implements IGNNBridge {
   /**
    * Extract imports from file (simplified)
    */
-  private async extractImports(file: string, allFiles: string[]): Promise<string[]> {
+  private async extractImports(_file: string, _allFiles: string[]): Promise<string[]> {
     // In production, would parse AST
     // For now, return empty array
     return [];
