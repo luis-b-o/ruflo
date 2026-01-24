@@ -1838,5 +1838,95 @@ export {
   sanitizeMetadata,
 } from './sanitizers.js';
 
+// Re-export memory management module
+export {
+  // Object Pooling
+  ObjectPool,
+  type Poolable,
+  type PoolStats,
+  type PoolConfig,
+  PooledBead,
+  PooledStep,
+  PooledFormula,
+  PooledConvoy,
+  PooledMolecule,
+  beadPool,
+  formulaPool,
+  stepPool,
+  convoyPool,
+  moleculePool,
+  type PoolType,
+  getAllPoolStats,
+  getTotalMemorySaved,
+  clearAllPools,
+  preWarmAllPools,
+  getPoolEfficiencySummary,
+
+  // Arena Allocator
+  Arena,
+  type ArenaStats,
+  type ArenaConfig,
+  type AllocatableType,
+  type TypeMap,
+  scopedArena,
+  withArena,
+  withArenaSync,
+  ArenaManager,
+  arenaManager,
+
+  // Memory Monitoring
+  MemoryMonitor,
+  type MemoryStats,
+  type MemoryPressureLevel,
+  type MemoryPressureCallback,
+  type MemoryMonitorConfig,
+  type MemoryMonitorEvents,
+  getMemoryUsage,
+  setMemoryLimit,
+  onMemoryPressure,
+  getDefaultMonitor,
+  disposeDefaultMonitor,
+  MemoryBudgetManager,
+  type MemoryBudget,
+  memoryBudget,
+
+  // Lazy Loading
+  Lazy,
+  type LazyState,
+  type LazyOptions,
+  type LazyStats,
+  getLazySingleton,
+  disposeLazySingleton,
+  disposeAllLazySingletons,
+  LazyModule,
+  LazyBridge,
+  LazyWasm,
+  LazyObserver,
+  createLazyProperty,
+
+  // Integrated Memory System
+  initializeMemorySystem,
+  getSystemMemoryStats,
+  getMemoryReport,
+  triggerMemoryCleanup,
+  shutdownMemorySystem,
+  isMemorySystemInitialized,
+  getMemoryMonitor,
+  type MemorySystemConfig,
+  type MemorySystemState,
+
+  // Quick-access utilities
+  acquireBead,
+  releaseBead,
+  acquireStep,
+  releaseStep,
+  acquireFormula,
+  releaseFormula,
+  acquireConvoy,
+  releaseConvoy,
+  acquireMolecule,
+  releaseMolecule,
+} from './memory/index.js';
+
 // Default export
 export default GasTownBridgePlugin;
