@@ -48,9 +48,6 @@ interface HNSWWasmModule {
  */
 export class PatientEmbeddingGenerator {
   private readonly dimensions: number;
-  private readonly icd10Vocab: Map<string, number> = new Map();
-  private readonly medicationVocab: Map<string, number> = new Map();
-  private vocabCounter = 0;
 
   constructor(dimensions: number = 768) {
     this.dimensions = dimensions;
