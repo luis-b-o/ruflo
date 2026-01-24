@@ -278,13 +278,23 @@ Uniform density              Exponential capacity toward boundary
 
 ## Performance Targets
 
-| Metric | Target |
-|--------|--------|
-| Embedding (10K nodes) | <10s |
-| Hyperbolic search | <5ms for 1M embeddings |
-| Taxonomic query | <10ms per inference |
-| Hierarchy comparison | <1s for 10K nodes |
-| Entailment graph build | <30s for 100K concepts |
+| Metric | Target | Baseline (Euclidean) | Improvement |
+|--------|--------|----------------------|-------------|
+| Embedding (10K nodes) | <10s | ~30s (high-dim Euclidean) | 3x |
+| Hyperbolic search | <5ms for 1M embeddings | ~50ms (Euclidean HNSW) | 10x |
+| Taxonomic query | <10ms per inference | ~100ms (graph traversal) | 10x |
+| Hierarchy comparison | <1s for 10K nodes | ~30s (tree edit distance) | 30x |
+| Entailment graph build | <30s for 100K concepts | ~10min (pairwise comparison) | 20x |
+| Dimension efficiency | 32-dim hyperbolic | 512-dim Euclidean equivalent | 16x memory |
+
+## Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| Numerical instability | Medium | Medium | Boundary clipping, numerical stabilization |
+| Non-hierarchical data | Medium | Low | Automatic fallback to Euclidean |
+| Curvature tuning | Medium | Low | Adaptive curvature via SONA |
+| Training complexity | High | Medium | Pretrained embeddings, transfer learning |
 
 ## Mobius Operations
 
