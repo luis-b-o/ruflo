@@ -990,7 +990,7 @@ function extractParty(sentence: string): string {
  */
 function filterByTimeframe(
   obligations: Obligation[],
-  timeframe: string
+  _timeframe: string
 ): Obligation[] {
   // Parse ISO duration or date range
   // Simplified implementation
