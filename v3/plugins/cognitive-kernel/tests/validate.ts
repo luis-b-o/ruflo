@@ -4,6 +4,17 @@
  */
 
 import { cognitiveKernelTools, getTool, getToolNames } from '../dist/mcp-tools.js';
+import type { MCPToolResult } from '../dist/types.js';
+
+// Helper to parse MCP result
+function parseResult(result: MCPToolResult): { success: boolean; data: any; error?: string } {
+  if (result.isError) {
+    const parsed = JSON.parse(result.content[0]?.text || '{}');
+    return { success: false, data: null, error: parsed.message || 'Unknown error' };
+  }
+  const data = JSON.parse(result.content[0]?.text || '{}');
+  return { success: true, data };
+}
 
 async function validate() {
   console.log('=== Cognitive Kernel Plugin Validation ===\n');
@@ -22,7 +33,7 @@ async function validate() {
     if (!tool) throw new Error('Tool not found');
 
     // Allocate
-    let result = await tool.handler({
+    let rawResult = await tool.handler({
       action: 'allocate',
       slot: {
         content: { type: 'context', data: 'Important reasoning context' },
@@ -32,28 +43,30 @@ async function validate() {
       capacity: 7
     });
 
-    if (!result.success) throw new Error(result.error?.message || 'Allocate failed');
-    const allocData = result.data as any;
-    const slotId = allocData.details?.slotId;
+    let { success, data, error } = parseResult(rawResult);
+    if (!success) throw new Error(error);
+    const slotId = data.details?.slotId;
     if (!slotId) throw new Error('No slot ID returned');
 
     // Retrieve
-    result = await tool.handler({
+    rawResult = await tool.handler({
       action: 'retrieve',
       slot: { id: slotId },
       capacity: 7
     });
 
-    if (!result.success) throw new Error(result.error?.message || 'Retrieve failed');
+    ({ success, data, error } = parseResult(rawResult));
+    if (!success) throw new Error(error);
 
     // Clear
-    result = await tool.handler({
+    rawResult = await tool.handler({
       action: 'clear',
       slot: { id: slotId },
       capacity: 7
     });
 
-    if (!result.success) throw new Error(result.error?.message || 'Clear failed');
+    ({ success, data, error } = parseResult(rawResult));
+    if (!success) throw new Error(error);
 
     console.log(`  OK: Allocate/Retrieve/Clear operations successful`);
     passed++;
@@ -70,11 +83,11 @@ async function validate() {
     const tool = getTool('cognition/attention-control');
     if (!tool) throw new Error('Tool not found');
 
-    const result = await tool.handler({
+    const rawResult = await tool.handler({
       mode: 'selective',
       targets: [
-        { entity: 'security_analysis', weight: 0.9, duration: 5000 },
-        { entity: 'performance_metrics', weight: 0.7, duration: 3000 }
+        { entity: 'security_analysis', weight: 0.9, duration: 500 },  // Duration in seconds, max 3600
+        { entity: 'performance_metrics', weight: 0.7, duration: 300 }
       ],
       filters: {
         includePatterns: ['security.*', 'auth.*'],
@@ -83,8 +96,8 @@ async function validate() {
       }
     });
 
-    if (!result.success) throw new Error(result.error?.message || 'Unknown error');
-    const data = result.data as any;
+    const { success, data, error } = parseResult(rawResult);
+    if (!success) throw new Error(error);
     if (!data.mode) throw new Error('Missing mode in response');
     if (!data.state) throw new Error('Missing state in response');
 
@@ -103,7 +116,7 @@ async function validate() {
     const tool = getTool('cognition/meta-monitor');
     if (!tool) throw new Error('Tool not found');
 
-    const result = await tool.handler({
+    const rawResult = await tool.handler({
       monitoring: [
         'confidence_calibration',
         'reasoning_coherence',
@@ -118,8 +131,8 @@ async function validate() {
       interventions: true
     });
 
-    if (!result.success) throw new Error(result.error?.message || 'Unknown error');
-    const data = result.data as any;
+    const { success, data, error } = parseResult(rawResult);
+    if (!success) throw new Error(error);
     if (!data.assessment) throw new Error('Missing assessment');
     if (typeof data.assessment.confidence !== 'number') throw new Error('Invalid assessment format');
 
@@ -138,7 +151,7 @@ async function validate() {
     const tool = getTool('cognition/scaffold');
     if (!tool) throw new Error('Tool not found');
 
-    const result = await tool.handler({
+    const rawResult = await tool.handler({
       task: {
         description: 'Implement a distributed consensus algorithm',
         complexity: 'complex',
@@ -151,8 +164,8 @@ async function validate() {
       }
     });
 
-    if (!result.success) throw new Error(result.error?.message || 'Unknown error');
-    const data = result.data as any;
+    const { success, data, error } = parseResult(rawResult);
+    if (!success) throw new Error(error);
     if (!Array.isArray(data.steps)) throw new Error('Invalid response format');
     if (!data.scaffoldType) throw new Error('Missing scaffoldType');
 
@@ -171,7 +184,7 @@ async function validate() {
     const tool = getTool('cognition/cognitive-load');
     if (!tool) throw new Error('Tool not found');
 
-    const result = await tool.handler({
+    const rawResult = await tool.handler({
       assessment: {
         intrinsic: 0.6,
         extraneous: 0.3,
@@ -181,8 +194,8 @@ async function validate() {
       threshold: 0.8
     });
 
-    if (!result.success) throw new Error(result.error?.message || 'Unknown error');
-    const data = result.data as any;
+    const { success, data, error } = parseResult(rawResult);
+    if (!success) throw new Error(error);
     if (!data.currentLoad) throw new Error('Missing currentLoad');
     if (typeof data.overloaded !== 'boolean') throw new Error('Invalid response format');
 
