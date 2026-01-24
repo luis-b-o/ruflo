@@ -34,13 +34,81 @@ Claude Flow V3 would benefit from:
 
 ## Decision
 
-Create `@claude-flow/plugin-gastown-bridge` that:
+Create `@claude-flow/plugin-gastown-bridge` with a **WASM-centric hybrid architecture**:
 
-1. **CLI Bridge**: Wraps `gt` and `bd` commands as MCP tools
-2. **Beads Sync**: Bidirectional sync between Beads and AgentDB
-3. **Formula Engine**: Native TypeScript formula parser/executor
-4. **Convoy Tracking**: Implement Gas Town convoy semantics in Claude Flow
-5. **GUPP Adapter**: Translate GUPP hooks to Claude Flow session persistence
+1. **CLI Bridge**: Wraps `gt` and `bd` commands for I/O operations only
+2. **WASM Computation**: Pure computation logic in Rust→WASM for 352x speedup
+3. **Beads Sync**: Bidirectional sync between Beads and AgentDB
+4. **Formula Engine**: WASM-based TOML formula parser/executor
+5. **Graph Analysis**: WASM-based dependency resolution and DAG operations
+6. **GUPP Adapter**: Translate GUPP hooks to Claude Flow session persistence
+
+## Architecture
+
+### WASM-Centric Hybrid Design
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Claude Flow V3 Plugin Host                      │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌─────────────────────┐    ┌─────────────────────────────────────┐ │
+│  │    CLI Bridge       │    │         WASM Computation Layer       │ │
+│  │  (I/O Operations)   │    │           (352x faster)              │ │
+│  │                     │    │                                      │ │
+│  │  • gt commands      │    │  ┌──────────────┐ ┌──────────────┐  │ │
+│  │  • bd commands      │    │  │ gastown-     │ │ ruvector-    │  │ │
+│  │  • File read/write  │    │  │ formula-wasm │ │ gnn-wasm     │  │ │
+│  │  • SQLite queries   │    │  │              │ │              │  │ │
+│  │                     │    │  │ • TOML parse │ │ • DAG ops    │  │ │
+│  │  [Node.js FFI]      │    │  │ • Variable   │ │ • Topo sort  │  │ │
+│  │                     │    │  │   cooking    │ │ • Cycle      │  │ │
+│  └─────────┬───────────┘    │  │ • Molecule   │ │   detection  │  │ │
+│            │                │  │   generation │ │ • Critical   │  │ │
+│            │                │  └──────────────┘ │   path       │  │ │
+│            │                │                   └──────────────┘  │ │
+│            │                │                                      │ │
+│            │                │  ┌──────────────┐ ┌──────────────┐  │ │
+│            │                │  │ micro-hnsw-  │ │ ruvector-    │  │ │
+│            │                │  │ wasm         │ │ learning-wasm│  │ │
+│            │                │  │              │ │              │  │ │
+│            │                │  │ • Pattern    │ │ • SONA       │  │ │
+│            │                │  │   search     │ │   patterns   │  │ │
+│            │                │  │ • 150x-12500x│ │ • MoE routing│  │ │
+│            │                │  │   speedup    │ │ • EWC++      │  │ │
+│            │                │  └──────────────┘ └──────────────┘  │ │
+│            │                │                                      │ │
+│            │                │  [wasm-bindgen interface]            │ │
+│            │                └─────────────────────────────────────┘ │
+│            │                              │                         │
+│            └──────────────┬───────────────┘                         │
+│                           │                                         │
+│                           ▼                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │                     MCP Tool Interface                          ││
+│  │                     (15 Tools + 5 WASM)                         ││
+│  └─────────────────────────────────────────────────────────────────┘│
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### WASM Module Responsibilities
+
+| Module | Purpose | Performance |
+|--------|---------|-------------|
+| `gastown-formula-wasm` | TOML parsing, variable cooking, molecule generation | 352x vs JS |
+| `ruvector-gnn-wasm` | DAG operations, topological sort, cycle detection, critical path | 150x vs JS |
+| `micro-hnsw-wasm` | Pattern similarity search, formula matching | 150x-12500x |
+| `ruvector-learning-wasm` | SONA patterns, success rate optimization | 50x vs JS |
+
+### Component Boundaries
+
+| Layer | Technology | Responsibilities |
+|-------|------------|------------------|
+| **CLI Bridge** | Node.js + child_process | `gt`/`bd` execution, file I/O, SQLite access |
+| **WASM Core** | Rust → wasm-bindgen | Formula parsing, graph analysis, pattern search |
+| **MCP Interface** | TypeScript | Tool definitions, request routing, response formatting |
+| **Sync Service** | TypeScript + WASM | Bidirectional Beads↔AgentDB synchronization |
 
 ## Plugin Specification
 
