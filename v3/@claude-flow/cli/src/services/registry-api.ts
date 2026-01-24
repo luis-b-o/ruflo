@@ -193,7 +193,7 @@ export async function checkHealth(): Promise<{
     const response = await fetch(`${REGISTRY_API_URL}?action=status`, {
       signal: AbortSignal.timeout(5000),
     });
-    return response.json();
+    return response.json() as Promise<{ healthy: boolean; latestCid?: string; error?: string }>;
   } catch (error) {
     return {
       healthy: false,
