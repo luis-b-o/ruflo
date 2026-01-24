@@ -18,6 +18,10 @@
     "./formula": {
       "import": "./dist/formula/index.js",
       "types": "./dist/formula/index.d.ts"
+    },
+    "./convoy": {
+      "import": "./dist/convoy/index.js",
+      "types": "./dist/convoy/index.d.ts"
     }
   },
   "files": [
