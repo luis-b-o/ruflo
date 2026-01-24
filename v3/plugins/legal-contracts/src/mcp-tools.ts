@@ -37,9 +37,6 @@ import {
   ClauseType,
   RiskCategory,
   RiskSeverity,
-  ObligationType,
-  LegalContractsError,
-  LegalErrorCodes,
 } from './types.js';
 import { createAttentionBridge } from './bridges/attention-bridge.js';
 import { createDAGBridge } from './bridges/dag-bridge.js';
