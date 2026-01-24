@@ -50,29 +50,36 @@ async function fetchNpmStats(packageName: string): Promise<{ downloads: number; 
 /**
  * Default plugin store configuration
  */
+/**
+ * Live IPFS Registry CID - Updated 2026-01-24
+ * This is the current pinned registry on Pinata
+ */
+export const LIVE_REGISTRY_CID = 'bafkreictvxdrcuku2yivzvagm24aocjkuwsezg7hvnyxvqf2pksixvareq';
+
 export const DEFAULT_PLUGIN_STORE_CONFIG: PluginStoreConfig = {
   registries: [
     {
       name: 'claude-flow-official',
       description: 'Official Claude Flow plugin registry',
-      ipnsName: 'k51qzi5uqu5dkplugin53t7w9w2d4xk6x0qkdvqv5h0h8rma',
-      gateway: 'https://ipfs.io',
-      publicKey: 'ed25519:0x1234567890abcdef',
+      // Use direct CID for reliable resolution (IPNS can be slow)
+      ipnsName: LIVE_REGISTRY_CID,
+      gateway: 'https://gateway.pinata.cloud',
+      publicKey: 'ed25519:21490c8ef5e6d9fea573382e52fbad7d0fa40c3eb124e6746706da7a420ae2d2',
       trusted: true,
       official: true,
     },
     {
       name: 'community-plugins',
       description: 'Community-contributed plugins',
-      ipnsName: 'k51qzi5uqu5dkcommunity7w9w2d4xk6x0qkdvqv5h0h8rmb',
-      gateway: 'https://dweb.link',
-      publicKey: 'ed25519:0xfedcba0987654321',
+      ipnsName: LIVE_REGISTRY_CID, // Same registry for now
+      gateway: 'https://ipfs.io',
+      publicKey: 'ed25519:21490c8ef5e6d9fea573382e52fbad7d0fa40c3eb124e6746706da7a420ae2d2',
       trusted: true,
       official: false,
     },
   ],
   defaultRegistry: 'claude-flow-official',
-  gateway: 'https://ipfs.io',
+  gateway: 'https://gateway.pinata.cloud',
   timeout: 30000,
   cacheDir: '.claude-flow/plugins/cache',
   cacheExpiry: 3600000, // 1 hour
