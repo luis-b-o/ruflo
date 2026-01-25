@@ -31,7 +31,7 @@ const { MAX_PARAM_LENGTH, MAX_ARRAY_ITEMS } = MCP_PARAM_LIMITS;
 /**
  * Validate string parameter
  */
-function validateStringParam(value: unknown, name: string, maxLength = MAX_PARAM_LENGTH): string {
+function validateStringParam(value: unknown, name: string, maxLength: number = MAX_PARAM_LENGTH): string {
   if (typeof value !== 'string') {
     throw new Error(`Parameter '${name}' must be a string`);
   }
@@ -44,7 +44,7 @@ function validateStringParam(value: unknown, name: string, maxLength = MAX_PARAM
 /**
  * Validate array parameter
  */
-function validateArrayParam<T>(value: unknown, name: string, maxItems = MAX_ARRAY_ITEMS): T[] {
+function validateArrayParam<T>(value: unknown, name: string, maxItems: number = MAX_ARRAY_ITEMS): T[] {
   if (!Array.isArray(value)) {
     throw new Error(`Parameter '${name}' must be an array`);
   }
