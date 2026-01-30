@@ -446,7 +446,7 @@ function getSystemMetrics() {
 
     // Check git commit count (proxy for project development)
     try {
-      const commitCount = parseInt(execSync('git rev-list --count HEAD 2>/dev/null || echo "0"', { encoding: 'utf-8' }).trim());
+      const commitCount = parseInt(execSync('git rev-list --count HEAD 2>' + nullDev, { encoding: 'utf-8' }).trim()) || 0;
       maturityScore += Math.min(30, Math.floor(commitCount / 10)); // Max 30% from commits
     } catch (e) { /* ignore */ }
 
