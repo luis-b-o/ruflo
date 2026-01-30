@@ -169,6 +169,16 @@ function generateHooksConfig(config: HooksConfig): object {
 
   // PreToolUse hooks - cross-platform via npx with defensive guards
   if (config.preToolUse) {
+    const preEditCmd = IS_WINDOWS
+      ? `npx @claude-flow/cli@latest hooks pre-edit --file "%TOOL_INPUT_file_path%" 2>${NULL_DEV}`
+      : '[ -n "$TOOL_INPUT_file_path" ] && npx @claude-flow/cli@latest hooks pre-edit --file "$TOOL_INPUT_file_path" 2>/dev/null || true';
+    const preCommandCmd = IS_WINDOWS
+      ? `npx @claude-flow/cli@latest hooks pre-command --command "%TOOL_INPUT_command%" 2>${NULL_DEV}`
+      : '[ -n "$TOOL_INPUT_command" ] && npx @claude-flow/cli@latest hooks pre-command --command "$TOOL_INPUT_command" 2>/dev/null || true';
+    const preTaskCmd = IS_WINDOWS
+      ? `npx @claude-flow/cli@latest hooks pre-task --description "%TOOL_INPUT_prompt%" 2>${NULL_DEV}`
+      : '[ -n "$TOOL_INPUT_prompt" ] && npx @claude-flow/cli@latest hooks pre-task --task-id "task-$(date +%s)" --description "$TOOL_INPUT_prompt" 2>/dev/null || true';
+
     hooks.PreToolUse = [
       // File edit hooks with intelligence routing
       {
@@ -176,7 +186,7 @@ function generateHooksConfig(config: HooksConfig): object {
         hooks: [
           {
             type: 'command',
-            command: '[ -n "$TOOL_INPUT_file_path" ] && npx @claude-flow/cli@latest hooks pre-edit --file "$TOOL_INPUT_file_path" 2>/dev/null || true',
+            command: preEditCmd,
             timeout: config.timeout,
             continueOnError: true,
           },
@@ -188,19 +198,19 @@ function generateHooksConfig(config: HooksConfig): object {
         hooks: [
           {
             type: 'command',
-            command: '[ -n "$TOOL_INPUT_command" ] && npx @claude-flow/cli@latest hooks pre-command --command "$TOOL_INPUT_command" 2>/dev/null || true',
+            command: preCommandCmd,
             timeout: config.timeout,
             continueOnError: true,
           },
         ],
       },
-      // Task/Agent hooks - require task-id for tracking
+      // Task/Agent hooks
       {
         matcher: '^Task$',
         hooks: [
           {
             type: 'command',
-            command: '[ -n "$TOOL_INPUT_prompt" ] && npx @claude-flow/cli@latest hooks pre-task --task-id "task-$(date +%s)" --description "$TOOL_INPUT_prompt" 2>/dev/null || true',
+            command: preTaskCmd,
             timeout: config.timeout,
             continueOnError: true,
           },
