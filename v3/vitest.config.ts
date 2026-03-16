@@ -29,14 +29,14 @@ export default defineConfig({
 
     // Exclude patterns
     exclude: [
-      'node_modules',
-      'dist',
+      '**/node_modules/**',
+      '**/dist/**',
       '.git',
     ],
 
     // Coverage configuration - London School targets
     coverage: {
-      enabled: true,
+      enabled: false, // Enable only via --coverage flag (prevents OOM in CI)
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './__tests__/coverage',
