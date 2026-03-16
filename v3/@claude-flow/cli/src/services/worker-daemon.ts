@@ -11,7 +11,8 @@
  */
 
 import { EventEmitter } from 'events';
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync } from 'fs';
+import { cpus } from 'os';
 import { join } from 'path';
 import {
   HeadlessWorkerExecutor,
@@ -128,15 +129,23 @@ export class WorkerDaemon extends EventEmitter {
 
     const claudeFlowDir = join(projectRoot, '.claude-flow');
 
+    // Read daemon config from .claude-flow/config.json (Layer B)
+    const fileConfig = this.readDaemonConfigFromFile(claudeFlowDir);
+
+    // CPU-proportional smart default instead of hardcoded 2.0
+    const cpuCount = cpus().length || 1; // Fallback for containers with restricted cgroups
+    const smartMaxCpuLoad = Math.max(cpuCount * 0.8, 2.0); // Floor of 2.0 for single-CPU machines
+
+    // Priority: constructor arg > config.json > smart default
     this.config = {
-      autoStart: config?.autoStart ?? false, // P1 fix: Default to false for explicit consent
+      autoStart: config?.autoStart ?? fileConfig.autoStart ?? false,
       logDir: config?.logDir ?? join(claudeFlowDir, 'logs'),
       stateFile: config?.stateFile ?? join(claudeFlowDir, 'daemon-state.json'),
-      maxConcurrent: config?.maxConcurrent ?? 2, // P0 fix: Limit concurrent workers
-      workerTimeoutMs: config?.workerTimeoutMs ?? DEFAULT_WORKER_TIMEOUT_MS,
+      maxConcurrent: config?.maxConcurrent ?? fileConfig.maxConcurrent ?? 2,
+      workerTimeoutMs: config?.workerTimeoutMs ?? fileConfig.workerTimeoutMs ?? DEFAULT_WORKER_TIMEOUT_MS,
       resourceThresholds: config?.resourceThresholds ?? {
-        maxCpuLoad: 2.0,
-        minFreeMemoryPercent: 20,
+        maxCpuLoad: fileConfig.maxCpuLoad ?? smartMaxCpuLoad,
+        minFreeMemoryPercent: fileConfig.minFreeMemoryPercent ?? 20,
       },
       workers: config?.workers ?? DEFAULT_WORKERS,
     };
@@ -215,6 +224,39 @@ export class WorkerDaemon extends EventEmitter {
   }
 
   /**
+   * Read daemon-specific config from .claude-flow/config.json
+   * Supports dot-notation keys like 'daemon.resourceThresholds.maxCpuLoad'
+   */
+  private readDaemonConfigFromFile(claudeFlowDir: string): {
+    autoStart?: boolean;
+    maxConcurrent?: number;
+    workerTimeoutMs?: number;
+    maxCpuLoad?: number;
+    minFreeMemoryPercent?: number;
+  } {
+    const configPath = join(claudeFlowDir, 'config.json');
+    if (!existsSync(configPath)) return {};
+    try {
+      const raw = JSON.parse(readFileSync(configPath, 'utf-8'));
+      // Support both flat keys at root and nested under scopes.project
+      const cfg = raw?.scopes?.project ?? raw;
+      const rawCpuLoad = cfg['daemon.resourceThresholds.maxCpuLoad'] ?? raw['daemon.resourceThresholds.maxCpuLoad'];
+      const rawMinMem = cfg['daemon.resourceThresholds.minFreeMemoryPercent'] ?? raw['daemon.resourceThresholds.minFreeMemoryPercent'];
+      const rawMaxConcurrent = cfg['daemon.maxConcurrent'] ?? raw['daemon.maxConcurrent'];
+      const rawTimeout = cfg['daemon.workerTimeoutMs'] ?? raw['daemon.workerTimeoutMs'];
+      return {
+        autoStart: typeof raw['daemon.autoStart'] === 'boolean' ? raw['daemon.autoStart'] : undefined,
+        maxConcurrent: (typeof rawMaxConcurrent === 'number' && rawMaxConcurrent > 0) ? rawMaxConcurrent : undefined,
+        workerTimeoutMs: (typeof rawTimeout === 'number' && rawTimeout > 0) ? rawTimeout : undefined,
+        maxCpuLoad: (typeof rawCpuLoad === 'number' && rawCpuLoad > 0) ? rawCpuLoad : undefined,
+        minFreeMemoryPercent: (typeof rawMinMem === 'number' && rawMinMem >= 0 && rawMinMem <= 100) ? rawMinMem : undefined,
+      };
+    } catch {
+      return {};
+    }
+  }
+
+  /**
    * Setup graceful shutdown handlers
    */
   private setupShutdownHandlers(): void {
@@ -276,6 +318,24 @@ export class WorkerDaemon extends EventEmitter {
               workerConfig.enabled = savedWorker.enabled;
             }
           }
+        }
+
+        // Restore resourceThresholds, maxConcurrent, workerTimeoutMs from saved state
+        // Only restore if valid numeric values within sane ranges
+        if (saved.config?.resourceThresholds) {
+          const rt = saved.config.resourceThresholds;
+          if (typeof rt.maxCpuLoad === 'number' && rt.maxCpuLoad > 0 && rt.maxCpuLoad < 1000) {
+            this.config.resourceThresholds.maxCpuLoad = rt.maxCpuLoad;
+          }
+          if (typeof rt.minFreeMemoryPercent === 'number' && rt.minFreeMemoryPercent >= 0 && rt.minFreeMemoryPercent <= 100) {
+            this.config.resourceThresholds.minFreeMemoryPercent = rt.minFreeMemoryPercent;
+          }
+        }
+        if (typeof saved.config?.maxConcurrent === 'number' && saved.config.maxConcurrent > 0) {
+          this.config.maxConcurrent = saved.config.maxConcurrent;
+        }
+        if (typeof saved.config?.workerTimeoutMs === 'number' && saved.config.workerTimeoutMs > 0) {
+          this.config.workerTimeoutMs = saved.config.workerTimeoutMs;
         }
 
         // Restore worker runtime states (runCount, successCount, etc.)
@@ -896,8 +956,7 @@ export class WorkerDaemon extends EventEmitter {
     // Also write to log file
     try {
       const logFile = join(this.config.logDir, 'daemon.log');
-      const fs = require('fs');
-      fs.appendFileSync(logFile, logMessage + '\n');
+      appendFileSync(logFile, logMessage + '\n');
     } catch {
       // Ignore log write errors
     }
