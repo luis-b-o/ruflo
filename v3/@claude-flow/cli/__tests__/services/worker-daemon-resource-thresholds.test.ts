@@ -63,6 +63,14 @@ describe('WorkerDaemon resource thresholds', () => {
 
       expect(config.resourceThresholds.maxCpuLoad).toBeGreaterThan(2.0);
     });
+
+    it('should use platform-aware default for minFreeMemoryPercent', () => {
+      const daemon = new WorkerDaemon(tempDir);
+      const config = daemon.getStatus().config;
+
+      const expectedMinFreeMem = process.platform === 'darwin' ? 5 : 10;
+      expect(config.resourceThresholds.minFreeMemoryPercent).toBe(expectedMinFreeMem);
+    });
   });
 
   // =========================================================================
@@ -174,8 +182,9 @@ describe('WorkerDaemon resource thresholds', () => {
       const daemon = new WorkerDaemon(tempDir);
       const config = daemon.getStatus().config;
 
+      const expectedMinFreeMem = process.platform === 'darwin' ? 5 : 10;
       expect(config.resourceThresholds.maxCpuLoad).toBeGreaterThanOrEqual(2.0);
-      expect(config.resourceThresholds.minFreeMemoryPercent).toBe(20);
+      expect(config.resourceThresholds.minFreeMemoryPercent).toBe(expectedMinFreeMem);
     });
   });
 
@@ -293,9 +302,10 @@ describe('WorkerDaemon resource thresholds', () => {
       const daemon = new WorkerDaemon(tempDir);
       const config = daemon.getStatus().config;
 
+      const expectedMinFreeMem = process.platform === 'darwin' ? 5 : 10;
       expect(typeof config.resourceThresholds.maxCpuLoad).toBe('number');
       expect(config.resourceThresholds.maxCpuLoad).toBeGreaterThanOrEqual(2.0);
-      expect(config.resourceThresholds.minFreeMemoryPercent).toBe(20);
+      expect(config.resourceThresholds.minFreeMemoryPercent).toBe(expectedMinFreeMem);
       expect(config.maxConcurrent).toBe(2); // default
     });
 
@@ -325,6 +335,85 @@ describe('WorkerDaemon resource thresholds', () => {
       const config = daemon.getStatus().config;
 
       expect(config.resourceThresholds.minFreeMemoryPercent).toBeLessThanOrEqual(100);
+    });
+  });
+
+  // =========================================================================
+  // processPendingWorkers busy-wait fix (WI-1 / PR #1052)
+  // =========================================================================
+  describe('processPendingWorkers busy-wait prevention', () => {
+    it('should not spin when all workers are deferred due to resource pressure', async () => {
+      // Set impossibly low thresholds so canRunWorker always rejects
+      const daemon = new WorkerDaemon(tempDir, {
+        maxConcurrent: 2,
+        resourceThresholds: { maxCpuLoad: 0.001, minFreeMemoryPercent: 99.99 },
+      });
+
+      // Seed the pending queue with a worker
+      const pendingWorkers = (daemon as any).pendingWorkers as string[];
+      pendingWorkers.push('map');
+
+      // Spy on executeWorkerWithConcurrencyControl to count invocations
+      const execSpy = vi.spyOn(daemon as any, 'executeWorkerWithConcurrencyControl');
+
+      await (daemon as any).processPendingWorkers();
+
+      // Should have been called exactly once — then broke out of the loop
+      expect(execSpy.mock.calls.length).toBe(1);
+      // The deferred worker should still be on the pending queue (pushed back by executeWorkerWithConcurrencyControl)
+      expect(pendingWorkers).toContain('map');
+    });
+
+    it('should schedule a backoff retry when no workers are running and a worker is deferred', async () => {
+      const daemon = new WorkerDaemon(tempDir, {
+        maxConcurrent: 2,
+        resourceThresholds: { maxCpuLoad: 0.001, minFreeMemoryPercent: 99.99 },
+      });
+
+      const pendingWorkers = (daemon as any).pendingWorkers as string[];
+      pendingWorkers.push('audit');
+
+      // Ensure no workers are currently running
+      expect((daemon as any).runningWorkers.size).toBe(0);
+
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      const callCountBefore = setTimeoutSpy.mock.calls.length;
+
+      await (daemon as any).processPendingWorkers();
+
+      // Find the 30-second backoff call among any setTimeout calls
+      const backoffCalls = setTimeoutSpy.mock.calls
+        .slice(callCountBefore)
+        .filter((call) => call[1] === 30_000);
+      expect(backoffCalls.length).toBe(1);
+
+      setTimeoutSpy.mockRestore();
+    });
+
+    it('should not schedule backoff when running workers will drain the queue', async () => {
+      const daemon = new WorkerDaemon(tempDir, {
+        maxConcurrent: 1,
+        resourceThresholds: { maxCpuLoad: 0.001, minFreeMemoryPercent: 99.99 },
+      });
+
+      // Simulate a worker already running — its finally block will re-trigger processPendingWorkers
+      (daemon as any).runningWorkers.add('optimize');
+
+      const pendingWorkers = (daemon as any).pendingWorkers as string[];
+      pendingWorkers.push('map');
+
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      const callCountBefore = setTimeoutSpy.mock.calls.length;
+
+      await (daemon as any).processPendingWorkers();
+
+      // No 30-second backoff should have been scheduled because a running worker exists
+      const backoffCalls = setTimeoutSpy.mock.calls
+        .slice(callCountBefore)
+        .filter((call) => call[1] === 30_000);
+      expect(backoffCalls.length).toBe(0);
+
+      setTimeoutSpy.mockRestore();
     });
   });
 });

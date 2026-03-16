@@ -136,6 +136,11 @@ export class WorkerDaemon extends EventEmitter {
     const cpuCount = cpus().length || 1; // Fallback for containers with restricted cgroups
     const smartMaxCpuLoad = Math.max(cpuCount * 0.8, 2.0); // Floor of 2.0 for single-CPU machines
 
+    // Platform-aware default: macOS os.freemem() excludes reclaimable file cache,
+    // so reported "free" is much lower than actually available memory.
+    // Linux reports available memory (including reclaimable cache) more accurately.
+    const defaultMinFreeMemory = process.platform === 'darwin' ? 5 : 10;
+
     // Priority: constructor arg > config.json > smart default
     this.config = {
       autoStart: config?.autoStart ?? fileConfig.autoStart ?? false,
@@ -145,7 +150,7 @@ export class WorkerDaemon extends EventEmitter {
       workerTimeoutMs: config?.workerTimeoutMs ?? fileConfig.workerTimeoutMs ?? DEFAULT_WORKER_TIMEOUT_MS,
       resourceThresholds: config?.resourceThresholds ?? {
         maxCpuLoad: fileConfig.maxCpuLoad ?? smartMaxCpuLoad,
-        minFreeMemoryPercent: fileConfig.minFreeMemoryPercent ?? 20,
+        minFreeMemoryPercent: fileConfig.minFreeMemoryPercent ?? defaultMinFreeMemory,
       },
       workers: config?.workers ?? DEFAULT_WORKERS,
     };
@@ -292,13 +297,30 @@ export class WorkerDaemon extends EventEmitter {
 
   /**
    * Process pending workers queue
+   *
+   * When executeWorkerWithConcurrencyControl defers a worker (returns null),
+   * we break immediately to avoid a busy-wait loop — the deferred worker is
+   * already back on the pendingWorkers queue by that point. If no workers are
+   * currently running when we break, we schedule a backoff retry so the queue
+   * does not get permanently stuck.
    */
   private async processPendingWorkers(): Promise<void> {
     while (this.pendingWorkers.length > 0 && this.runningWorkers.size < this.config.maxConcurrent) {
       const workerType = this.pendingWorkers.shift()!;
       const workerConfig = this.config.workers.find(w => w.type === workerType);
       if (workerConfig) {
-        await this.executeWorkerWithConcurrencyControl(workerConfig);
+        const result = await this.executeWorkerWithConcurrencyControl(workerConfig);
+        if (result === null) {
+          // Worker was deferred (resource pressure or concurrency limit).
+          // Break to avoid tight-looping — the next executeWorker() completion
+          // will call processPendingWorkers() again via the finally block.
+          if (this.runningWorkers.size === 0) {
+            // No workers running means nobody will trigger the finally-block
+            // callback, so schedule a backoff retry to avoid a stuck queue.
+            setTimeout(() => this.processPendingWorkers(), 30_000);
+          }
+          break;
+        }
       }
     }
   }
@@ -397,6 +419,7 @@ export class WorkerDaemon extends EventEmitter {
     this.saveState();
 
     this.log('info', `Daemon started with ${this.config.workers.filter(w => w.enabled).length} workers`);
+    this.log('info', `Daemon started (PID: ${process.pid}, CPUs: ${cpus().length}, maxCpuLoad: ${this.config.resourceThresholds.maxCpuLoad}, minFreeMemoryPercent: ${this.config.resourceThresholds.minFreeMemoryPercent}%)`);
   }
 
   /**
