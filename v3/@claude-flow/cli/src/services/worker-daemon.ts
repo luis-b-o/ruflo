@@ -74,7 +74,7 @@ interface DaemonStatus {
   config: DaemonConfig;
 }
 
-interface DaemonConfig {
+export interface DaemonConfig {
   autoStart: boolean;
   logDir: string;
   stateFile: string;
@@ -133,7 +133,7 @@ export class WorkerDaemon extends EventEmitter {
     const fileConfig = this.readDaemonConfigFromFile(claudeFlowDir);
 
     // CPU-proportional smart default instead of hardcoded 2.0
-    const cpuCount = cpus().length || 1; // Fallback for containers with restricted cgroups
+    const cpuCount = WorkerDaemon.getEffectiveCpuCount();
     const smartMaxCpuLoad = Math.max(cpuCount * 0.8, 2.0); // Floor of 2.0 for single-CPU machines
 
     // Platform-aware default: macOS os.freemem() excludes reclaimable file cache,
@@ -142,15 +142,17 @@ export class WorkerDaemon extends EventEmitter {
     const defaultMinFreeMemory = process.platform === 'darwin' ? 5 : 10;
 
     // Priority: constructor arg > config.json > smart default
+    // For resourceThresholds, merge field-by-field so partial overrides
+    // (e.g. only --max-cpu-load) still pick up defaults for other fields.
     this.config = {
       autoStart: config?.autoStart ?? fileConfig.autoStart ?? false,
       logDir: config?.logDir ?? join(claudeFlowDir, 'logs'),
       stateFile: config?.stateFile ?? join(claudeFlowDir, 'daemon-state.json'),
       maxConcurrent: config?.maxConcurrent ?? fileConfig.maxConcurrent ?? 2,
       workerTimeoutMs: config?.workerTimeoutMs ?? fileConfig.workerTimeoutMs ?? DEFAULT_WORKER_TIMEOUT_MS,
-      resourceThresholds: config?.resourceThresholds ?? {
-        maxCpuLoad: fileConfig.maxCpuLoad ?? smartMaxCpuLoad,
-        minFreeMemoryPercent: fileConfig.minFreeMemoryPercent ?? defaultMinFreeMemory,
+      resourceThresholds: {
+        maxCpuLoad: config?.resourceThresholds?.maxCpuLoad ?? fileConfig.maxCpuLoad ?? smartMaxCpuLoad,
+        minFreeMemoryPercent: config?.resourceThresholds?.minFreeMemoryPercent ?? fileConfig.minFreeMemoryPercent ?? defaultMinFreeMemory,
       },
       workers: config?.workers ?? DEFAULT_WORKERS,
     };
@@ -226,6 +228,37 @@ export class WorkerDaemon extends EventEmitter {
    */
   getHeadlessExecutor(): HeadlessWorkerExecutor | null {
     return this.headlessExecutor;
+  }
+
+  /**
+   * Detect effective CPU count for the current environment.
+   *
+   * Inside Docker / K8s containers, os.cpus().length reports the HOST cpu
+   * count, not the container limit (Node.js #28762 — wontfix).  We read
+   * cgroup v2 / v1 quota files first so the maxCpuLoad threshold stays
+   * meaningful under resource-limited containers.
+   */
+  static getEffectiveCpuCount(): number {
+    // 1. Try cgroup v2: /sys/fs/cgroup/cpu.max
+    try {
+      const cpuMax = readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim();
+      const [quotaStr, periodStr] = cpuMax.split(' ');
+      if (quotaStr !== 'max') {
+        const quota = parseInt(quotaStr, 10);
+        const period = parseInt(periodStr, 10);
+        if (quota > 0 && period > 0) return Math.ceil(quota / period);
+      }
+    } catch { /* not in cgroup v2 */ }
+
+    // 2. Try cgroup v1: /sys/fs/cgroup/cpu/cpu.cfs_quota_us
+    try {
+      const quota = parseInt(readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8').trim(), 10);
+      const period = parseInt(readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8').trim(), 10);
+      if (quota > 0 && period > 0) return Math.ceil(quota / period);
+    } catch { /* not in cgroup v1 */ }
+
+    // 3. Fallback to os.cpus().length
+    return cpus().length || 1;
   }
 
   /**
@@ -992,9 +1025,9 @@ let daemonInstance: WorkerDaemon | null = null;
 /**
  * Get or create daemon instance
  */
-export function getDaemon(projectRoot?: string): WorkerDaemon {
+export function getDaemon(projectRoot?: string, config?: Partial<DaemonConfig>): WorkerDaemon {
   if (!daemonInstance && projectRoot) {
-    daemonInstance = new WorkerDaemon(projectRoot);
+    daemonInstance = new WorkerDaemon(projectRoot, config);
   }
   if (!daemonInstance) {
     throw new Error('Daemon not initialized. Provide projectRoot on first call.');
@@ -1005,8 +1038,8 @@ export function getDaemon(projectRoot?: string): WorkerDaemon {
 /**
  * Start daemon (for use in session-start hook)
  */
-export async function startDaemon(projectRoot: string): Promise<WorkerDaemon> {
-  const daemon = getDaemon(projectRoot);
+export async function startDaemon(projectRoot: string, config?: Partial<DaemonConfig>): Promise<WorkerDaemon> {
+  const daemon = getDaemon(projectRoot, config);
   await daemon.start();
   return daemon;
 }
