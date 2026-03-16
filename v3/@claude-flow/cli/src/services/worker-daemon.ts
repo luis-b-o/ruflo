@@ -451,8 +451,7 @@ export class WorkerDaemon extends EventEmitter {
     // Save state
     this.saveState();
 
-    this.log('info', `Daemon started with ${this.config.workers.filter(w => w.enabled).length} workers`);
-    this.log('info', `Daemon started (PID: ${process.pid}, CPUs: ${cpus().length}, maxCpuLoad: ${this.config.resourceThresholds.maxCpuLoad}, minFreeMemoryPercent: ${this.config.resourceThresholds.minFreeMemoryPercent}%)`);
+    this.log('info', `Daemon started (PID: ${process.pid}, CPUs: ${cpus().length}, workers: ${this.config.workers.filter(w => w.enabled).length}, maxCpuLoad: ${this.config.resourceThresholds.maxCpuLoad}, minFreeMemoryPercent: ${this.config.resourceThresholds.minFreeMemoryPercent}%)`);
   }
 
   /**
