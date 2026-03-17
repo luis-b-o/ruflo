@@ -123,9 +123,14 @@ export class WorkerDaemon extends EventEmitter {
   private headlessExecutor: HeadlessWorkerExecutor | null = null;
   private headlessAvailable: boolean = false;
 
+  // Preserve the original constructor config so we can detect explicit overrides
+  // during state restoration (R1: constructor config takes priority over stale state)
+  private originalConfig?: Partial<DaemonConfig>;
+
   constructor(projectRoot: string, config?: Partial<DaemonConfig>) {
     super();
     this.projectRoot = projectRoot;
+    this.originalConfig = config;
 
     const claudeFlowDir = join(projectRoot, '.claude-flow');
 
@@ -286,7 +291,7 @@ export class WorkerDaemon extends EventEmitter {
         autoStart: typeof raw['daemon.autoStart'] === 'boolean' ? raw['daemon.autoStart'] : undefined,
         maxConcurrent: (typeof rawMaxConcurrent === 'number' && rawMaxConcurrent > 0) ? rawMaxConcurrent : undefined,
         workerTimeoutMs: (typeof rawTimeout === 'number' && rawTimeout > 0) ? rawTimeout : undefined,
-        maxCpuLoad: (typeof rawCpuLoad === 'number' && rawCpuLoad > 0) ? rawCpuLoad : undefined,
+        maxCpuLoad: (typeof rawCpuLoad === 'number' && rawCpuLoad > 0 && rawCpuLoad < 1000) ? rawCpuLoad : undefined,
         minFreeMemoryPercent: (typeof rawMinMem === 'number' && rawMinMem >= 0 && rawMinMem <= 100) ? rawMinMem : undefined,
       };
     } catch {
@@ -350,7 +355,7 @@ export class WorkerDaemon extends EventEmitter {
           if (this.runningWorkers.size === 0) {
             // No workers running means nobody will trigger the finally-block
             // callback, so schedule a backoff retry to avoid a stuck queue.
-            setTimeout(() => this.processPendingWorkers(), 30_000);
+            setTimeout(() => this.processPendingWorkers(), 30_000).unref();
           }
           break;
         }
@@ -377,7 +382,7 @@ export class WorkerDaemon extends EventEmitter {
 
         // Restore resourceThresholds, maxConcurrent, workerTimeoutMs from saved state
         // Only restore if valid numeric values within sane ranges
-        if (saved.config?.resourceThresholds) {
+        if (saved.config?.resourceThresholds && !this.originalConfig?.resourceThresholds) {
           const rt = saved.config.resourceThresholds;
           if (typeof rt.maxCpuLoad === 'number' && rt.maxCpuLoad > 0 && rt.maxCpuLoad < 1000) {
             this.config.resourceThresholds.maxCpuLoad = rt.maxCpuLoad;
