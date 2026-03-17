@@ -41,6 +41,15 @@ interface SonaEngineInstance {
   flush(): void;
 }
 
+
+/**
+ * ESM/CJS interop helper — handles `.default` for CJS modules.
+ * Uses `'default' in mod` check which is safer than `mod.default || mod`.
+ */
+async function importWithInterop<T = any>(packageName: string): Promise<T> {
+  const mod = await import(packageName);
+  return ('default' in mod) ? (mod as any).default : mod;
+}
 // Lazy-loaded WASM modules
 let microLoRA: WasmMicroLoRA | null = null;
 let scopedLoRA: WasmScopedLoRA | null = null;
@@ -136,7 +145,7 @@ export async function initializeTraining(config: TrainingConfig = {}): Promise<{
     features.push('TrajectoryBuffer');
 
     // Initialize attention mechanisms
-    const attention: any = await import('@ruvector/attention');
+    const attention: any = await importWithInterop('@ruvector/attention');
 
     if (config.useFlashAttention !== false) {
       flashAttention = new attention.FlashAttention(dim, 64);
@@ -180,10 +189,9 @@ export async function initializeTraining(config: TrainingConfig = {}): Promise<{
     // Initialize SONA (optional, backward compatible)
     if (config.useSona !== false) {
       try {
-        const sona = await import('@ruvector/sona');
+        const sona = await importWithInterop('@ruvector/sona');
         const sonaRank = config.sonaRank || 4;
         // SonaEngine constructor: (dim, rank, alpha, learningRate) - TypeScript types are wrong
-        // @ts-expect-error - SonaEngine accepts 4 positional args but types say 1
         sonaEngine = new sona.SonaEngine(dim, sonaRank, alpha, lr) as SonaEngineInstance;
         sonaAvailable = true;
         features.push(`SONA (${dim}-dim, rank-${sonaRank}, 624k learn/s)`);
@@ -459,7 +467,7 @@ export async function benchmarkTraining(
   dim?: number,
   iterations?: number
 ): Promise<BenchmarkResult[]> {
-  const attention: any = await import('@ruvector/attention');
+  const attention: any = await importWithInterop('@ruvector/attention');
   lastBenchmark = attention.benchmarkAttention(dim || 256, 100, iterations || 1000);
   return lastBenchmark ?? [];
 }
